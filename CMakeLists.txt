@@ -12,14 +12,14 @@ endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 
-file(GLOB_RECURSE PLAZZA_SOURCES CONFIGURE_DEPENDS source/*.cpp)
+file(GLOB_RECURSE PLAZZA_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 list(FILTER PLAZZA_SOURCES EXCLUDE REGEX ".*/main\\.cpp$")
 
 add_library(plazza_core STATIC ${PLAZZA_SOURCES})
 target_include_directories(plazza_core PUBLIC include)
 target_link_libraries(plazza_core PUBLIC pthread)
 
-add_executable(plazza source/main.cpp)
+add_executable(plazza src/main.cpp)
 target_link_libraries(plazza PRIVATE plazza_core)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt)
