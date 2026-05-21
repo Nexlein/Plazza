@@ -3,13 +3,12 @@ build-*/
 out/
 cmake-build-*/
 
-tests/
-
 *.o
 *.a
 *.so
 *.dylib
 *.exe
+*.pdf
 
 *.log
 
