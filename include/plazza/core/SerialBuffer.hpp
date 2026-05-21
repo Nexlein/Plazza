@@ -7,10 +7,11 @@
 
 #pragma once
 
-#include "plazza/reception/Order.hpp"
-#include <vector>
-#include <cstring>
 #include <cstdint>
+#include <cstring>
+#include <vector>
+
+#include "plazza/reception/Order.hpp"
 
 namespace plazza::core {
 
@@ -22,15 +23,17 @@ namespace plazza::core {
         SerialBuffer& operator<<(const plazza::reception::Order& order);
         SerialBuffer& operator>>(plazza::reception::Order& order);
 
-    private:
-        template<typename T>
-        inline void writeRaw(const T& val) {
+        private:
+        template <typename T>
+        inline void writeRaw(const T& val)
+        {
             const uint8_t* bytes = reinterpret_cast<const uint8_t*>(&val);
             _buffer.insert(_buffer.end(), bytes, bytes + sizeof(T));
         }
 
-        template<typename T>
-        inline void readRaw(T& val) {
+        template <typename T>
+        inline void readRaw(T& val)
+        {
             std::memcpy(&val, _buffer.data() + _readPos, sizeof(T));
             _readPos += sizeof(T);
         }

@@ -6,10 +6,12 @@
 */
 
 #include "plazza/core/SerialBuffer.hpp"
+
 #include <cstring>
 
 namespace plazza::core {
-    SerialBuffer& SerialBuffer::operator<<(const plazza::reception::Order& order) {
+    SerialBuffer& SerialBuffer::operator<<(const plazza::reception::Order& order)
+    {
         uint32_t start = static_cast<uint32_t>(_buffer.size());
         _buffer.resize(_buffer.size() + sizeof(uint32_t));
 
@@ -22,7 +24,8 @@ namespace plazza::core {
         return *this;
     }
 
-    SerialBuffer& SerialBuffer::operator>>(plazza::reception::Order& order) {
+    SerialBuffer& SerialBuffer::operator>>(plazza::reception::Order& order)
+    {
         uint32_t len;
         readRaw(len);
 
@@ -31,4 +34,4 @@ namespace plazza::core {
         readRaw(order.count);
         return *this;
     }
-}
+}  // namespace plazza::core
