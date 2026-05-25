@@ -19,4 +19,5 @@ namespace plazza::core {
 
     void Mutex::trylock() { pthread_mutex_trylock(&_mutex); }
 
+    pthread_mutex_t& Mutex::getMutex() { return _mutex; }
 }  // namespace plazza::core
