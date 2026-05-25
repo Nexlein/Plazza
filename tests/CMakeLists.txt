@@ -15,6 +15,10 @@ target_link_libraries(test_pizza_recipe PRIVATE plazza_core Catch2::Catch2WithMa
 add_executable(test_serial_buffer serialBuffer/test_serialBuffer.cpp)
 target_link_libraries(test_serial_buffer PRIVATE plazza_core Catch2::Catch2WithMain)
 
+add_executable(test_process process/test_process.cpp)
+target_link_libraries(test_process PRIVATE plazza_core Catch2::Catch2WithMain)
+
 include(CTest)
 include(Catch)
 catch_discover_tests(test_pizza_recipe)
+catch_discover_tests(test_process)
