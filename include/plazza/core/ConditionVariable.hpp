@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include "IConditionVariable.hpp"
-
 #include <pthread.h>
+
+#include "IConditionVariable.hpp"
 
 namespace plazza::core {
 
@@ -18,7 +18,7 @@ namespace plazza::core {
         ConditionVariable();
         ~ConditionVariable() = default;
 
-        void wait(plazza::core::IMutex &mutex) override;
+        void wait(plazza::core::IMutex& mutex) override;
         void waitFor(plazza::core::IMutex& mutex, std::chrono::milliseconds duration) override;
         void notifyOne() override;
         void notifyAll() override;

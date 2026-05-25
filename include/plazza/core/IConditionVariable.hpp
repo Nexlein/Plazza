@@ -7,8 +7,9 @@
 
 #pragma once
 
-#include "IMutex.hpp"
 #include <chrono>
+
+#include "IMutex.hpp"
 
 namespace plazza::core {
 
@@ -16,7 +17,7 @@ namespace plazza::core {
         public:
         virtual ~IConditionVariable() = default;
 
-        virtual void wait(plazza::core::IMutex &mutex) = 0;
+        virtual void wait(plazza::core::IMutex& mutex) = 0;
         virtual void waitFor(plazza::core::IMutex& mutex, std::chrono::milliseconds duration) = 0;
         virtual void notifyOne() = 0;
         virtual void notifyAll() = 0;
