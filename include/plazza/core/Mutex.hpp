@@ -22,6 +22,7 @@ namespace plazza::core {
         void unlock() override;
         void trylock() override;
 
+        pthread_mutex_t& getMutex();
         private:
         pthread_mutex_t _mutex;
     };
