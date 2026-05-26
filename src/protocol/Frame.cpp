@@ -40,6 +40,47 @@ namespace plazza::protocol {
         return finish(FrameKind::Ack, body);
     }
 
+    std::vector<uint8_t> encode(const RequestFrame& frame)
+    {
+        plazza::core::SerialBuffer body;
+        body << frame.orderId << frame.pizzaIdx << frame.type << frame.size;
+        return finish(FrameKind::Request, body);
+    }
+
+    std::vector<uint8_t> encode(const AcceptedFrame& frame)
+    {
+        plazza::core::SerialBuffer body;
+        body << frame.orderId << frame.pizzaIdx;
+        return finish(FrameKind::Accepted, body);
+    }
+
+    std::vector<uint8_t> encode(const RejectedFrame& frame)
+    {
+        plazza::core::SerialBuffer body;
+        body << frame.orderId << frame.pizzaIdx;
+        return finish(FrameKind::Rejected, body);
+    }
+
+    std::vector<uint8_t> encode(const CompletedFrame& frame)
+    {
+        plazza::core::SerialBuffer body;
+        body << frame.orderId << frame.pizzaIdx;
+        return finish(FrameKind::Completed, body);
+    }
+
+    std::vector<uint8_t> encode(const StatusQueryFrame&)
+    {
+        plazza::core::SerialBuffer body;
+        return finish(FrameKind::StatusQuery, body);
+    }
+
+    std::vector<uint8_t> encode(const StatusReplyFrame& frame)
+    {
+        plazza::core::SerialBuffer body;
+        body << frame.cooksTotal << frame.outstanding;
+        return finish(FrameKind::StatusReply, body);
+    }
+
     std::vector<uint8_t> encode(const AnyFrame& frame)
     {
         return std::visit([](const auto& f) { return encode(f); }, frame);
@@ -67,6 +108,33 @@ namespace plazza::protocol {
             case FrameKind::Ack: {
                 AckFrame frame;
                 body >> frame.token;
+                return frame;
+            }
+            case FrameKind::Request: {
+                RequestFrame frame;
+                body >> frame.orderId >> frame.pizzaIdx >> frame.type >> frame.size;
+                return frame;
+            }
+            case FrameKind::Accepted: {
+                AcceptedFrame frame;
+                body >> frame.orderId >> frame.pizzaIdx;
+                return frame;
+            }
+            case FrameKind::Rejected: {
+                RejectedFrame frame;
+                body >> frame.orderId >> frame.pizzaIdx;
+                return frame;
+            }
+            case FrameKind::Completed: {
+                CompletedFrame frame;
+                body >> frame.orderId >> frame.pizzaIdx;
+                return frame;
+            }
+            case FrameKind::StatusQuery:
+                return StatusQueryFrame{};
+            case FrameKind::StatusReply: {
+                StatusReplyFrame frame;
+                body >> frame.cooksTotal >> frame.outstanding;
                 return frame;
             }
             default:
