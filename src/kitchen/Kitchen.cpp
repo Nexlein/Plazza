@@ -9,6 +9,7 @@
 
 #include "plazza/core/ScopedLock.hpp"
 #include "plazza/kitchen/Cook.hpp"
+#include "plazza/pizza/Pizza.hpp"
 
 namespace plazza::kitchen {
 
@@ -18,14 +19,14 @@ namespace plazza::kitchen {
     {
     }
 
-    bool Kitchen::tryAccept(plazza::pizza::Pizza pizza)
+    bool Kitchen::tryAccept(plazza::pizza::Pizza pizza, uint32_t orderId, uint32_t pizzaIdx)
     {
         {
             plazza::core::ScopedLock lock(&_capMutex);
             if (_outstanding >= 2 * _cfg.cookCount) return false;
             ++_outstanding;
         }
-        _pool->enqueue([this, pizza]() {
+        _pool->enqueue([this, pizza, orderId, pizzaIdx]() {
             try {
                 Cook cook(pizza, _cfg.cookingMultiplier);
                 cook();
@@ -38,7 +39,7 @@ namespace plazza::kitchen {
             }
             if (_onComplete) {
                 try {
-                    _onComplete(pizza);
+                    _onComplete(pizza, orderId, pizzaIdx);
                 } catch (...) {
                 }
             }
@@ -60,6 +61,12 @@ namespace plazza::kitchen {
             _channel = std::make_unique<plazza::ipc::FifoChannel>(
                 _cfg.channelBasePath, plazza::ipc::FifoChannel::Role::Peer);
 
+            setOnComplete([this](
+                              const plazza::pizza::Pizza&, uint32_t orderId,
+                              uint32_t pizzaIdx) {
+                sendFrame(plazza::protocol::CompletedFrame{orderId, pizzaIdx});
+            });
+
             while (true) {
                 auto raw = _channel->recv();
                 if (!raw.has_value()) break;
@@ -76,6 +83,25 @@ namespace plazza::kitchen {
         if (std::holds_alternative<plazza::protocol::HeartbeatFrame>(frame)) {
             const auto& hb = std::get<plazza::protocol::HeartbeatFrame>(frame);
             sendFrame(plazza::protocol::AckFrame{hb.token});
+            return;
+        }
+
+        if (std::holds_alternative<plazza::protocol::RequestFrame>(frame)) {
+            const auto& req = std::get<plazza::protocol::RequestFrame>(frame);
+            auto pizza = plazza::pizza::makePizza(req.type, req.size);
+            if (tryAccept(pizza, req.orderId, req.pizzaIdx)) {
+                sendFrame(plazza::protocol::AcceptedFrame{req.orderId, req.pizzaIdx});
+            } else {
+                sendFrame(plazza::protocol::RejectedFrame{req.orderId, req.pizzaIdx});
+            }
+            return;
+        }
+
+        if (std::holds_alternative<plazza::protocol::StatusQueryFrame>(frame)) {
+            sendFrame(plazza::protocol::StatusReplyFrame{
+                static_cast<uint32_t>(_cfg.cookCount),
+                static_cast<uint32_t>(outstanding())});
+            return;
         }
     }
 

@@ -37,7 +37,7 @@ TEST_CASE("Kitchen::tryAccept respects 2 x N capacity gate", "[kitchen][cooks]")
     Kitchen k(makeCfg(3, 0.1F));
 
     std::atomic<int> completed{0};
-    k.setOnComplete([&](const Pizza&) { completed.fetch_add(1); });
+    k.setOnComplete([&](const Pizza&, uint32_t, uint32_t) { completed.fetch_add(1); });
 
     const Pizza pizza = makePizza(PizzaType::Margarita, PizzaSize::M);
 
@@ -69,7 +69,7 @@ TEST_CASE("Kitchen with N=1 rejects after 2 pizzas in flight", "[kitchen][cooks]
 {
     Kitchen k(makeCfg(1, 0.1F));
     std::atomic<int> completed{0};
-    k.setOnComplete([&](const Pizza&) { completed.fetch_add(1); });
+    k.setOnComplete([&](const Pizza&, uint32_t, uint32_t) { completed.fetch_add(1); });
 
     const Pizza pizza = makePizza(PizzaType::Regina, PizzaSize::L);
 
