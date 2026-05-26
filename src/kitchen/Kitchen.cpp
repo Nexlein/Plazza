@@ -8,10 +8,51 @@
 #include "plazza/kitchen/Kitchen.hpp"
 
 #include "plazza/core/ScopedLock.hpp"
+#include "plazza/kitchen/Cook.hpp"
 
 namespace plazza::kitchen {
 
-    Kitchen::Kitchen(Config cfg) : _cfg(std::move(cfg)) {}
+    Kitchen::Kitchen(Config cfg)
+        : _cfg(std::move(cfg)),
+          _pool(std::make_unique<plazza::core::ThreadPool>(_cfg.cookCount))
+    {
+    }
+
+    bool Kitchen::tryAccept(plazza::pizza::Pizza pizza)
+    {
+        {
+            plazza::core::ScopedLock lock(&_capMutex);
+            if (_outstanding >= 2 * _cfg.cookCount) return false;
+            ++_outstanding;
+        }
+        _pool->enqueue([this, pizza]() {
+            try {
+                Cook cook(pizza, _cfg.cookingMultiplier);
+                cook();
+            } catch (...) {
+                // Slice 5.3 will surface real cook errors via a status frame.
+            }
+            {
+                plazza::core::ScopedLock lock(&_capMutex);
+                if (_outstanding > 0) --_outstanding;
+            }
+            if (_onComplete) {
+                try {
+                    _onComplete(pizza);
+                } catch (...) {
+                }
+            }
+        });
+        return true;
+    }
+
+    std::size_t Kitchen::outstanding() const
+    {
+        plazza::core::ScopedLock lock(&_capMutex);
+        return _outstanding;
+    }
+
+    void Kitchen::setOnComplete(OnCompleteFn fn) { _onComplete = std::move(fn); }
 
     int Kitchen::run()
     {
