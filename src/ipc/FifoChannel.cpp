@@ -137,3 +137,11 @@ std::optional<std::vector<uint8_t>> plazza::ipc::FifoChannel::recv()
     if (len > 0 && !readAll(_readFd, payload.data(), len)) return std::nullopt;
     return payload;
 }
+
+void plazza::ipc::FifoChannel::closeWrite()
+{
+    if (_writeFd >= 0) {
+        close(_writeFd);
+        _writeFd = -1;
+    }
+}

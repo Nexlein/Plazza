@@ -30,6 +30,8 @@ namespace plazza::ipc {
         void send(const std::vector<uint8_t>& payload) override;
         std::optional<std::vector<uint8_t>> recv() override;
 
+        void closeWrite();
+
         private:
         std::string _pathFwd;
         std::string _pathBwd;
