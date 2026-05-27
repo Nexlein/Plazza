@@ -16,6 +16,10 @@ if(NOT Catch2_FOUND)
     fetchcontent_makeavailable(Catch2)
 endif()
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(-Wno-c2y-extensions)
+endif()
+
 add_executable(test_pizza_recipe pizza/test_recipe.cpp)
 target_link_libraries(test_pizza_recipe PRIVATE plazza_core Catch2::Catch2WithMain)
 
