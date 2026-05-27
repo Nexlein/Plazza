@@ -36,6 +36,9 @@ target_link_libraries(test_pizza_flow PRIVATE plazza_core Catch2::Catch2WithMain
 add_executable(test_frames protocol/test_frames.cpp)
 target_link_libraries(test_frames PRIVATE plazza_core Catch2::Catch2WithMain)
 
+add_executable(test_stock kitchen/test_stock.cpp)
+target_link_libraries(test_stock PRIVATE plazza_core Catch2::Catch2WithMain)
+
 include(CTest)
 include(Catch)
 catch_discover_tests(test_pizza_recipe)
@@ -47,3 +50,4 @@ catch_discover_tests(test_kitchen_bootstrap)
 catch_discover_tests(test_cook_pool)
 catch_discover_tests(test_pizza_flow)
 catch_discover_tests(test_frames)
+catch_discover_tests(test_stock)

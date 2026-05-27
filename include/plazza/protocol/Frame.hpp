@@ -64,9 +64,9 @@ namespace plazza::protocol {
         uint32_t outstanding{0};
     };
 
-    using AnyFrame = std::variant<
-        HeartbeatFrame, AckFrame, RequestFrame, AcceptedFrame, RejectedFrame,
-        CompletedFrame, StatusQueryFrame, StatusReplyFrame>;
+    using AnyFrame =
+        std::variant<HeartbeatFrame, AckFrame, RequestFrame, AcceptedFrame, RejectedFrame,
+                     CompletedFrame, StatusQueryFrame, StatusReplyFrame>;
 
     std::vector<uint8_t> encode(const HeartbeatFrame& frame);
     std::vector<uint8_t> encode(const AckFrame& frame);

@@ -29,8 +29,8 @@ namespace plazza::kitchen {
             std::string channelBasePath;
         };
 
-        using OnCompleteFn = std::function<void(
-            const plazza::pizza::Pizza&, uint32_t orderId, uint32_t pizzaIdx)>;
+        using OnCompleteFn =
+            std::function<void(const plazza::pizza::Pizza&, uint32_t orderId, uint32_t pizzaIdx)>;
 
         explicit Kitchen(Config cfg);
         ~Kitchen() = default;
@@ -40,8 +40,7 @@ namespace plazza::kitchen {
 
         int run();
 
-        bool tryAccept(
-            plazza::pizza::Pizza pizza, uint32_t orderId = 0, uint32_t pizzaIdx = 0);
+        bool tryAccept(plazza::pizza::Pizza pizza, uint32_t orderId = 0, uint32_t pizzaIdx = 0);
         std::size_t outstanding() const;
         std::size_t cookCount() const { return _cfg.cookCount; }
 

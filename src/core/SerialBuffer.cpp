@@ -91,9 +91,8 @@ namespace plazza::core {
         uint32_t len = static_cast<uint32_t>(value.size());
         writeRaw(len);
         if (len > 0)
-            _buffer.insert(
-                _buffer.end(), reinterpret_cast<const uint8_t*>(value.data()),
-                reinterpret_cast<const uint8_t*>(value.data()) + len);
+            _buffer.insert(_buffer.end(), reinterpret_cast<const uint8_t*>(value.data()),
+                           reinterpret_cast<const uint8_t*>(value.data()) + len);
         return *this;
     }
 
