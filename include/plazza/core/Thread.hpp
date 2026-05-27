@@ -21,7 +21,9 @@ namespace plazza::core {
         template <typename Function, typename... Args>
         Thread(Function&& f, Args&&... args) : _status(Status::NOT_STARTED)
         {
-            _task = std::bind(std::forward<Function>(f), std::forward<Args>(args)...);
+            _task = [f = std::forward<Function>(f), ... args = std::forward<Args>(args)]() {
+                std::invoke(f, args...);
+            };
         }
 
         ~Thread();

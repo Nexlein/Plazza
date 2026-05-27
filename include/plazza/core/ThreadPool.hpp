@@ -27,7 +27,9 @@ namespace plazza::core {
         template <typename Function, typename... Args>
         void enqueue(Function&& f, Args&&... args)
         {
-            auto task = std::bind(std::forward<Function>(f), std::forward<Args>(args)...);
+            auto task = [f = std::forward<Function>(f), ... args = std::forward<Args>(args)]() {
+                std::invoke(f, args...);
+            };
             _taskQueue.push(task);
         }
 
