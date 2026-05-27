@@ -28,8 +28,7 @@ namespace plazza::kitchen {
         Stock& operator=(const Stock&) = delete;
 
         bool tryConsume(const plazza::pizza::Recipe& recipe);
-        bool waitAndConsume(
-            const plazza::pizza::Recipe& recipe, const std::atomic<bool>& stop);
+        bool waitAndConsume(const plazza::pizza::Recipe& recipe, const std::atomic<bool>& stop);
 
         void restockOnce();
         void notifyAll();

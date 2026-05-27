@@ -14,8 +14,7 @@
 namespace plazza::kitchen {
 
     Kitchen::Kitchen(Config cfg)
-        : _cfg(std::move(cfg)),
-          _pool(std::make_unique<plazza::core::ThreadPool>(_cfg.cookCount))
+        : _cfg(std::move(cfg)), _pool(std::make_unique<plazza::core::ThreadPool>(_cfg.cookCount))
     {
     }
 
@@ -61,9 +60,7 @@ namespace plazza::kitchen {
             _channel = std::make_unique<plazza::ipc::FifoChannel>(
                 _cfg.channelBasePath, plazza::ipc::FifoChannel::Role::Peer);
 
-            setOnComplete([this](
-                              const plazza::pizza::Pizza&, uint32_t orderId,
-                              uint32_t pizzaIdx) {
+            setOnComplete([this](const plazza::pizza::Pizza&, uint32_t orderId, uint32_t pizzaIdx) {
                 sendFrame(plazza::protocol::CompletedFrame{orderId, pizzaIdx});
             });
 
@@ -98,9 +95,8 @@ namespace plazza::kitchen {
         }
 
         if (std::holds_alternative<plazza::protocol::StatusQueryFrame>(frame)) {
-            sendFrame(plazza::protocol::StatusReplyFrame{
-                static_cast<uint32_t>(_cfg.cookCount),
-                static_cast<uint32_t>(outstanding())});
+            sendFrame(plazza::protocol::StatusReplyFrame{static_cast<uint32_t>(_cfg.cookCount),
+                                                         static_cast<uint32_t>(outstanding())});
             return;
         }
     }

@@ -21,8 +21,7 @@ namespace plazza::kitchen {
     {
         // Slice 4.2 placeholder: sleep for the effective bake time. Slice 5.3
         // replaces this with ingredient consumption + real cooking.
-        long long ms =
-            static_cast<long long>(_pizza.recipe.baseBakeTime * 1000.0F * _multiplier);
+        long long ms = static_cast<long long>(_pizza.recipe.baseBakeTime * 1000.0F * _multiplier);
         if (ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(ms));
     }
 

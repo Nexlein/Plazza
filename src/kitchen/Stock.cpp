@@ -13,10 +13,7 @@
 
 namespace plazza::kitchen {
 
-    Stock::Stock()
-    {
-        _counts.fill(kInitialPerIngredient);
-    }
+    Stock::Stock() { _counts.fill(kInitialPerIngredient); }
 
     Stock::Tally Stock::tally(const plazza::pizza::Recipe& recipe)
     {
@@ -52,8 +49,7 @@ namespace plazza::kitchen {
         return true;
     }
 
-    bool Stock::waitAndConsume(
-        const plazza::pizza::Recipe& recipe, const std::atomic<bool>& stop)
+    bool Stock::waitAndConsume(const plazza::pizza::Recipe& recipe, const std::atomic<bool>& stop)
     {
         Tally need = tally(recipe);
         plazza::core::ScopedLock lock(&_mutex);
