@@ -22,6 +22,13 @@ namespace plazza::kitchen {
         if (_cfg.restockMs > 0) _restocker.start();
     }
 
+    Kitchen::~Kitchen()
+    {
+        // Wake any cook parked in Stock::waitAndConsume so _pool can join them.
+        _shuttingDown.store(true);
+        _stock.notifyAll();
+    }
+
     bool Kitchen::tryAccept(plazza::pizza::Pizza pizza, uint32_t orderId, uint32_t pizzaIdx)
     {
         {
@@ -31,10 +38,9 @@ namespace plazza::kitchen {
         }
         _pool->enqueue([this, pizza, orderId, pizzaIdx]() {
             try {
-                Cook cook(pizza, _cfg.cookingMultiplier);
+                Cook cook(pizza, _cfg.cookingMultiplier, _stock, _shuttingDown);
                 cook();
             } catch (...) {
-                // Slice 5.3 will surface real cook errors via a status frame.
             }
             {
                 plazza::core::ScopedLock lock(&_capMutex);

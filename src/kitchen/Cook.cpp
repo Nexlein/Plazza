@@ -12,15 +12,15 @@
 
 namespace plazza::kitchen {
 
-    Cook::Cook(plazza::pizza::Pizza pizza, float multiplier)
-        : _pizza(pizza), _multiplier(multiplier)
+    Cook::Cook(plazza::pizza::Pizza pizza, float multiplier, Stock& stock,
+               const std::atomic<bool>& stop)
+        : _pizza(pizza), _multiplier(multiplier), _stock(stock), _stop(stop)
     {
     }
 
     void Cook::operator()()
     {
-        // Slice 4.2 placeholder: sleep for the effective bake time. Slice 5.3
-        // replaces this with ingredient consumption + real cooking.
+        if (!_stock.waitAndConsume(_pizza.recipe, _stop)) return;
         long long ms = static_cast<long long>(_pizza.recipe.baseBakeTime * 1000.0F * _multiplier);
         if (ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(ms));
     }

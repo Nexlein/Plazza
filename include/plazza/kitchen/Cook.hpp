@@ -7,13 +7,17 @@
 
 #pragma once
 
+#include <atomic>
+
+#include "plazza/kitchen/Stock.hpp"
 #include "plazza/pizza/Pizza.hpp"
 
 namespace plazza::kitchen {
 
     class Cook {
         public:
-        Cook(plazza::pizza::Pizza pizza, float multiplier);
+        Cook(plazza::pizza::Pizza pizza, float multiplier, Stock& stock,
+             const std::atomic<bool>& stop);
 
         void operator()();
 
@@ -22,6 +26,8 @@ namespace plazza::kitchen {
         private:
         plazza::pizza::Pizza _pizza;
         float _multiplier;
+        Stock& _stock;
+        const std::atomic<bool>& _stop;
     };
 
 }  // namespace plazza::kitchen
