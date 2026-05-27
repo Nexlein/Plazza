@@ -14,8 +14,12 @@
 namespace plazza::kitchen {
 
     Kitchen::Kitchen(Config cfg)
-        : _cfg(std::move(cfg)), _pool(std::make_unique<plazza::core::ThreadPool>(_cfg.cookCount))
+        : _cfg(std::move(cfg)),
+          _stock(),
+          _restocker(_stock, _cfg.restockMs),
+          _pool(std::make_unique<plazza::core::ThreadPool>(_cfg.cookCount))
     {
+        if (_cfg.restockMs > 0) _restocker.start();
     }
 
     bool Kitchen::tryAccept(plazza::pizza::Pizza pizza, uint32_t orderId, uint32_t pizzaIdx)

@@ -15,6 +15,8 @@
 #include "plazza/core/Mutex.hpp"
 #include "plazza/core/ThreadPool.hpp"
 #include "plazza/ipc/FifoChannel.hpp"
+#include "plazza/kitchen/Restocker.hpp"
+#include "plazza/kitchen/Stock.hpp"
 #include "plazza/pizza/Pizza.hpp"
 #include "plazza/protocol/Frame.hpp"
 
@@ -56,8 +58,11 @@ namespace plazza::kitchen {
         mutable plazza::core::Mutex _capMutex;
         std::size_t _outstanding{0};
         plazza::core::Mutex _sendMutex;
-        // _pool last so it is destroyed first: workers join before the mutexes
-        // and callbacks they may touch go away.
+        // Member order is load-bearing for shutdown: _pool destroys first
+        // (joining cook workers), then _restocker stops the timer thread,
+        // then _stock is torn down.
+        Stock _stock;
+        Restocker _restocker;
         std::unique_ptr<plazza::core::ThreadPool> _pool;
     };
 
