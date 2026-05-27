@@ -21,6 +21,9 @@ target_link_libraries(plazza_core PUBLIC pthread)
 
 add_executable(plazza src/main.cpp)
 target_link_libraries(plazza PRIVATE plazza_core)
+set_target_properties(plazza PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+)
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt)
     enable_testing()
