@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -35,7 +36,7 @@ namespace plazza::kitchen {
             std::function<void(const plazza::pizza::Pizza&, uint32_t orderId, uint32_t pizzaIdx)>;
 
         explicit Kitchen(Config cfg);
-        ~Kitchen() = default;
+        ~Kitchen();
 
         Kitchen(const Kitchen&) = delete;
         Kitchen& operator=(const Kitchen&) = delete;
@@ -58,6 +59,9 @@ namespace plazza::kitchen {
         mutable plazza::core::Mutex _capMutex;
         std::size_t _outstanding{0};
         plazza::core::Mutex _sendMutex;
+        // _shuttingDown is declared before _stock so its lifetime fully covers
+        // every cook's reference to it during pool teardown.
+        std::atomic<bool> _shuttingDown{false};
         // Member order is load-bearing for shutdown: _pool destroys first
         // (joining cook workers), then _restocker stops the timer thread,
         // then _stock is torn down.
