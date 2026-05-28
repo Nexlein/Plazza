@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <functional>
 #include <iosfwd>
 #include <queue>
 
@@ -17,7 +18,8 @@ namespace plazza::reception {
 
     class Shell {
         public:
-        Shell(Logger& logger, std::istream& in, std::ostream& out);
+        Shell(Logger& logger, std::istream& in, std::ostream& out,
+              std::function<void(const Order&)> onOrder);
 
         int run();
 
@@ -25,7 +27,7 @@ namespace plazza::reception {
         Logger& _logger;
         std::istream& _in;
         std::ostream& _out;
-        std::queue<Order> _pending;
+        std::function<void(const Order&)> _onOrder;
 
         void handleStatus();
         bool handleOrderLine(const std::string& line);
