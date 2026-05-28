@@ -25,6 +25,7 @@ namespace plazza::reception {
     class Reception {
         public:
         Reception(float cookingMultiplier, std::size_t cooksPerKitchen, std::size_t restockMs);
+        ~Reception();
 
         int run();
         void dispatchOrders(Logger &logger);
@@ -37,6 +38,7 @@ namespace plazza::reception {
 
         private:
         void spawnKitchen();
+        std::atomic<bool> _running{true};
         float _cookingMultiplier;
         std::size_t _cooksPerKitchen;
         std::size_t _restockMs;

@@ -28,6 +28,13 @@ namespace plazza::reception {
     {
     }
 
+    Reception::~Reception()
+    {
+        _running = false;
+        _pendingCv.notifyOne();
+        if (_dispatcherThread) _dispatcherThread->join();
+    }
+
     int Reception::run()
     {
         Logger logger(_logPath, /*mirrorStdout=*/false);
@@ -76,7 +83,7 @@ namespace plazza::reception {
     void Reception::dispatchOrders(Logger& logger)
     {
         _dispatcherThread = std::make_unique<core::Thread>([this, &logger]() {
-            while (true) {
+            while (_running) {
                 Order order;
                 {
                     core::ScopedLock lock(&_pendingMutex);
@@ -109,6 +116,7 @@ namespace plazza::reception {
                 }
             }
         });
+        _dispatcherThread->start();
     }
 
 }  // namespace plazza::reception
