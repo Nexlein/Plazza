@@ -105,8 +105,13 @@ namespace plazza::kitchen {
         }
 
         if (std::holds_alternative<plazza::protocol::StatusQueryFrame>(frame)) {
+            std::array<uint32_t, 9> stock{};
+            for (std::size_t i = 0; i < 9; ++i)
+                stock[i] = static_cast<uint32_t>(
+                    _stock.available(static_cast<plazza::pizza::Ingredient>(i)));
             sendFrame(plazza::protocol::StatusReplyFrame{static_cast<uint32_t>(_cfg.cookCount),
-                                                         static_cast<uint32_t>(outstanding())});
+                                                         static_cast<uint32_t>(outstanding()),
+                                                         stock});
             return;
         }
     }
