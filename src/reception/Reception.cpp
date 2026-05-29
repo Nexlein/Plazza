@@ -111,9 +111,9 @@ namespace plazza::reception {
     }
 
     // update les occupations des kitchens dans le registry
-    void Reception::dispatchOrders(Logger& logger)
+    void Reception::dispatchOrders([[maybe_unused]] Logger& logger)
     {
-        _dispatcherThread = std::make_unique<core::Thread>([this, &logger]() {
+        _dispatcherThread = std::make_unique<core::Thread>([this]() {
             while (_running) {
                 Order order;
                 {
@@ -124,7 +124,7 @@ namespace plazza::reception {
                     _pending.pop();
                 }
 
-                for (int i = 0; i < order.count; i++) {
+                for (std::size_t i = 0; i < order.count; i++) {
                     pizza::Pizza pizza = pizza::makePizza(order.type, order.size);
                     core::ScopedLock lock(&_registryMutex);
 
