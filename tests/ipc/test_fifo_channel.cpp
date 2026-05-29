@@ -5,9 +5,8 @@
 ** test_fifo_channel
 */
 
-#include <numeric>
-
 #include <catch2/catch_test_macros.hpp>
+#include <numeric>
 
 #include "plazza/core/Process.hpp"
 #include "plazza/ipc/FifoChannel.hpp"
