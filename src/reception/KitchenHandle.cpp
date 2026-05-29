@@ -62,6 +62,29 @@ namespace plazza::reception {
         _channel.reset();
     }
 
+    void KitchenHandle::triggerStatusQuery()
+    {
+        plazza::core::ScopedLock lock(&_statusMutex);
+        _lastStatusReply = std::nullopt;
+        _waitingForStatus = true;
+        sendFrame(plazza::protocol::StatusQueryFrame{});
+    }
+
+    std::optional<plazza::protocol::StatusReplyFrame> KitchenHandle::collectStatusReply(
+        std::chrono::milliseconds timeout)
+    {
+        plazza::core::ScopedLock lock(&_statusMutex);
+        auto start = std::chrono::steady_clock::now();
+        while (_waitingForStatus && !_stopped.load()) {
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
+            if (elapsed >= timeout) break;
+            _statusCv.waitFor(_statusMutex, timeout - elapsed);
+        }
+        _waitingForStatus = false;
+        return _lastStatusReply;
+    }
+
     pid_t KitchenHandle::pid() const { return _process ? _process->getPid() : -1; }
 
     void KitchenHandle::readerLoop()
@@ -77,6 +100,14 @@ namespace plazza::reception {
 
             try {
                 auto frame = plazza::protocol::decode(*raw);
+                if (std::holds_alternative<plazza::protocol::StatusReplyFrame>(frame)) {
+                    plazza::core::ScopedLock lock(&_statusMutex);
+                    if (_waitingForStatus) {
+                        _lastStatusReply = std::get<plazza::protocol::StatusReplyFrame>(frame);
+                        _waitingForStatus = false;
+                        _statusCv.notifyOne();
+                    }
+                }
                 if (_onFrame) _onFrame(frame);
             } catch (...) {
                 // malformed frame; drop and continue

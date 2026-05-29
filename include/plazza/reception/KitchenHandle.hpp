@@ -9,11 +9,15 @@
 
 #include <sys/types.h>
 
+#include <array>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <optional>
 
+#include "plazza/core/ConditionVariable.hpp"
 #include "plazza/core/Mutex.hpp"
 #include "plazza/core/Thread.hpp"
 #include "plazza/ipc/FifoChannel.hpp"
@@ -40,6 +44,10 @@ namespace plazza::reception {
         void sendFrame(const plazza::protocol::AnyFrame& frame);
         void shutdown();
 
+        void triggerStatusQuery();
+        std::optional<plazza::protocol::StatusReplyFrame> collectStatusReply(
+            std::chrono::milliseconds timeout);
+
         std::size_t id() const { return _id; }
         pid_t pid() const;
 
@@ -53,6 +61,11 @@ namespace plazza::reception {
         std::unique_ptr<plazza::core::Thread> _readerThread;
         FrameCallback _onFrame;
         std::atomic<bool> _stopped{false};
+
+        plazza::core::Mutex _statusMutex;
+        plazza::core::ConditionVariable _statusCv;
+        std::optional<plazza::protocol::StatusReplyFrame> _lastStatusReply;
+        bool _waitingForStatus{false};
     };
 
 }  // namespace plazza::reception
