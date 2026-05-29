@@ -8,8 +8,10 @@
 #include "plazza/reception/Reception.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <sstream>
+#include <thread>
 
 #include "plazza/core/ScopedLock.hpp"
 #include "plazza/pizza/Pizza.hpp"
@@ -24,6 +26,7 @@ namespace plazza::reception {
           _cooksPerKitchen(cooksPerKitchen),
           _restockMs(restockMs),
           _dispatcherThread(nullptr),
+          _reaperThread(nullptr),
           _orderId(0)
     {
     }
@@ -33,6 +36,7 @@ namespace plazza::reception {
         _running = false;
         _pendingCv.notifyOne();
         if (_dispatcherThread) _dispatcherThread->join();
+        if (_reaperThread) _reaperThread->join();
     }
 
     int Reception::run()
@@ -60,6 +64,25 @@ namespace plazza::reception {
             });
 
         dispatchOrders(logger);
+
+        _reaperThread = std::make_unique<core::Thread>([this]() {
+            while (_running) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                if (!_running) break;
+
+                core::ScopedLock lock(&_registryMutex);
+                for (auto it = _registry.begin(); it != _registry.end(); ) {
+                    auto exitStatus = it->handle->tryWaitProcess();
+                    if (exitStatus.has_value()) {
+                        it = _registry.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+            }
+        });
+        _reaperThread->start();
+
         const int code = shell.run();
         logger.info("reception shutting down");
         return code;
