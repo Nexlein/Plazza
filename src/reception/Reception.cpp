@@ -71,7 +71,7 @@ namespace plazza::reception {
                 if (!_running) break;
 
                 core::ScopedLock lock(&_registryMutex);
-                for (auto it = _registry.begin(); it != _registry.end(); ) {
+                for (auto it = _registry.begin(); it != _registry.end();) {
                     auto exitStatus = it->handle->tryWaitProcess();
                     if (exitStatus.has_value()) {
                         it = _registry.erase(it);
