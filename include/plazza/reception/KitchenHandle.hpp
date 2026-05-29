@@ -50,6 +50,7 @@ namespace plazza::reception {
 
         std::size_t id() const { return _id; }
         pid_t pid() const;
+        std::optional<int> tryWaitProcess();
 
         private:
         void readerLoop();
