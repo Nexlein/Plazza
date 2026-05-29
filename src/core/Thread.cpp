@@ -11,7 +11,7 @@ namespace plazza::core {
 
     Thread::~Thread()
     {
-        if (_status == Status::RUNNING) join();
+        if (_status == Status::RUNNING || _status == Status::DEAD) join();
     }
 
     void Thread::start()
@@ -26,7 +26,7 @@ namespace plazza::core {
     {
         if (_status == Status::RUNNING || _status == Status::DEAD) {
             pthread_join(_thread, nullptr);
-            _status = Status::DEAD;
+            _status = Status::JOINED;
         }
     }
 
