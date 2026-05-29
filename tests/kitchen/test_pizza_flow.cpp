@@ -94,7 +94,7 @@ TEST_CASE("Pizza flow: 3 requests → 3 Accepted + 3 Completed", "[kitchen][prot
             handle.sendFrame(
                 RequestFrame{/*orderId=*/1, /*pizzaIdx=*/idx, PizzaType::Margarita, PizzaSize::M});
 
-        auto condition = [](const auto& frames) {
+        auto condition = [](const std::vector<AnyFrame>& frames) {
             auto t = tally(frames);
             return t.accepted == 3 && t.completed == 3;
         };
@@ -122,7 +122,7 @@ TEST_CASE("Pizza flow: oversubscribed request is Rejected", "[kitchen][protocol]
             handle.sendFrame(
                 RequestFrame{/*orderId=*/9, /*pizzaIdx=*/idx, PizzaType::Margarita, PizzaSize::S});
 
-        auto condition = [](const auto& frames) {
+        auto condition = [](const std::vector<AnyFrame>& frames) {
             auto t = tally(frames);
             return (t.accepted + t.rejected) == 3 && t.completed == 2;
         };
@@ -148,7 +148,7 @@ TEST_CASE("Pizza flow: StatusQuery replies with cook count and outstanding", "[k
 
         handle.sendFrame(StatusQueryFrame{});
 
-        auto condition = [](const auto& frames) { return !frames.empty(); };
+        auto condition = [](const std::vector<AnyFrame>& frames) { return !frames.empty(); };
         REQUIRE(waitUntil(sink, 2s, condition));
     }
 

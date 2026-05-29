@@ -88,8 +88,8 @@ TEST_CASE("Cook flow: real bake time honours multiplier", "[kitchen][cook][timin
         handle.sendFrame(
             RequestFrame{/*orderId=*/1, /*pizzaIdx=*/0, PizzaType::Regina, PizzaSize::M});
 
-        REQUIRE(
-            waitUntil(sink, 3s, [](const auto& frames) { return countCompleted(frames) == 1; }));
+        auto cond = [](const std::vector<AnyFrame>& frames) { return countCompleted(frames) == 1; };
+        REQUIRE(waitUntil(sink, 3s, cond));
 
         auto elapsed = std::chrono::steady_clock::now() - sent;
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
@@ -114,9 +114,10 @@ TEST_CASE("Cook flow: stock back-pressure resolves via restocker", "[kitchen][co
             handle.sendFrame(
                 RequestFrame{/*orderId=*/7, /*pizzaIdx=*/idx, PizzaType::Regina, PizzaSize::M});
 
-        REQUIRE(waitUntil(sink, 5s, [](const auto& frames) {
+        auto cond0 = [](const std::vector<AnyFrame>& frames) {
             return countAccepted(frames) == 6 && countCompleted(frames) == 6;
-        }));
+        };
+        REQUIRE(waitUntil(sink, 5s, cond0));
     }
 
     auto frames = sink.snapshot();
@@ -145,9 +146,10 @@ TEST_CASE("Cook flow: shutdown wakes cooks parked on missing ingredients",
 
         // Wait until the kitchen has acked all 8 and completed the 5 that
         // could actually get ingredients. The remaining 3 are now parked.
-        REQUIRE(waitUntil(sink, 3s, [](const auto& frames) {
+        auto cond1 = [](const std::vector<AnyFrame>& frames) {
             return countAccepted(frames) == 8 && countCompleted(frames) >= 5;
-        }));
+        };
+        REQUIRE(waitUntil(sink, 3s, cond1));
     }
     auto elapsed = std::chrono::steady_clock::now() - t0;
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
