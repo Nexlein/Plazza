@@ -7,11 +7,15 @@
 
 #include "plazza/reception/Shell.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <istream>
 #include <ostream>
 #include <sstream>
 #include <string>
 
+#include "plazza/pizza/Pizza.hpp"
+#include "plazza/reception/KitchenHandle.hpp"
 #include "plazza/reception/Parser.hpp"
 
 namespace plazza::reception {
@@ -29,8 +33,9 @@ namespace plazza::reception {
     }  // namespace
 
     Shell::Shell(Logger& logger, std::istream& in, std::ostream& out,
-                 std::function<void(const Order&)> onOrder)
-        : _logger(logger), _in(in), _out(out), _onOrder(onOrder)
+                 std::function<void(const Order&)> onOrder,
+                 std::function<std::vector<KitchenHandle*>()> getKitchens)
+        : _logger(logger), _in(in), _out(out), _onOrder(onOrder), _getKitchens(getKitchens)
     {
     }
 
@@ -54,8 +59,50 @@ namespace plazza::reception {
 
     void Shell::handleStatus()
     {
-        _out << "(no kitchens running)\n";
-        _logger.info("status: no kitchens running");
+        auto kitchens = _getKitchens();
+        if (kitchens.empty()) {
+            _out << "(no kitchens running)\n";
+            _logger.info("status: no kitchens running");
+            return;
+        }
+
+        // Trigger queries in parallel
+        for (auto* k : kitchens) k->triggerStatusQuery();
+
+        // Collect responses (limit total wait time to 80ms)
+        auto start = std::chrono::steady_clock::now();
+        _out << "Active Kitchens Status:\n";
+        for (auto* k : kitchens) {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start);
+            auto timeout = std::chrono::milliseconds(80) - elapsed;
+            if (timeout.count() <= 0) timeout = std::chrono::milliseconds(0);
+
+            auto reply = k->collectStatusReply(timeout);
+            _out << "Kitchen #" << k->id() << " (PID " << k->pid() << "):\n";
+            if (!reply.has_value()) {
+                _out << "  Status: (Query timed out or offline)\n";
+                continue;
+            }
+
+            uint32_t total = reply->cooksTotal;
+            uint32_t outstanding = reply->outstanding;
+            uint32_t busy = std::min(outstanding, total);
+            uint32_t idle = total - busy;
+            uint32_t queueDepth = (outstanding > total) ? (outstanding - total) : 0;
+
+            _out << "  Cooks: " << busy << " busy, " << idle << " idle (total " << total << ")\n";
+            _out << "  Outstanding pizzas: " << outstanding << " (queue depth: " << queueDepth
+                 << ")\n";
+            _out << "  Ingredients stock:\n";
+            for (std::size_t i = 0; i < 9; ++i) {
+                auto ing = static_cast<plazza::pizza::Ingredient>(i);
+                _out << "    " << plazza::pizza::ingredientToString(ing) << ": " << reply->stock[i]
+                     << "\n";
+            }
+        }
+        _out.flush();
+        _logger.info("status command executed");
     }
 
     bool Shell::handleOrderLine(const std::string& line)
