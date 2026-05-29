@@ -43,13 +43,21 @@ namespace plazza::reception {
                << ", cooks=" << _cooksPerKitchen << ", restock_ms=" << _restockMs << ")";
         logger.info(banner.str());
 
-        Shell shell(logger, std::cin, std::cout, [this](const Order& order) {
-            {
-                core::ScopedLock lock(&_pendingMutex);
-                _pending.push(order);
-            }
-            _pendingCv.notifyOne();
-        });
+        Shell shell(
+            logger, std::cin, std::cout,
+            [this](const Order& order) {
+                {
+                    core::ScopedLock lock(&_pendingMutex);
+                    _pending.push(order);
+                }
+                _pendingCv.notifyOne();
+            },
+            [this]() {
+                core::ScopedLock lock(&_registryMutex);
+                std::vector<KitchenHandle*> handles;
+                for (const auto& kr : _registry) handles.push_back(kr.handle.get());
+                return handles;
+            });
 
         dispatchOrders(logger);
         const int code = shell.run();
@@ -87,7 +95,8 @@ namespace plazza::reception {
                 Order order;
                 {
                     core::ScopedLock lock(&_pendingMutex);
-                    while (_pending.empty()) _pendingCv.wait(_pendingMutex);
+                    while (_running && _pending.empty()) _pendingCv.wait(_pendingMutex);
+                    if (!_running) break;
                     order = _pending.front();
                     _pending.pop();
                 }
