@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <variant>
 #include <vector>
@@ -62,6 +63,7 @@ namespace plazza::protocol {
     struct StatusReplyFrame {
         uint32_t cooksTotal{0};
         uint32_t outstanding{0};
+        std::array<uint32_t, 9> stock{};
     };
 
     using AnyFrame =
