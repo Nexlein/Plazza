@@ -6,11 +6,10 @@
 */
 
 #include <atomic>
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <thread>
 #include <vector>
-
-#include <catch2/catch_test_macros.hpp>
 
 #include "plazza/kitchen/Stock.hpp"
 #include "plazza/pizza/Pizza.hpp"
@@ -22,10 +21,9 @@ using namespace std::chrono_literals;
 TEST_CASE("Stock starts with 5 of every ingredient", "[stock]")
 {
     Stock stock;
-    for (auto i : {Ingredient::Dough, Ingredient::Tomato, Ingredient::Gruyere,
-                   Ingredient::Ham, Ingredient::Mushrooms, Ingredient::Steak,
-                   Ingredient::Eggplant, Ingredient::GoatCheese,
-                   Ingredient::ChiefLove}) {
+    for (auto i : {Ingredient::Dough, Ingredient::Tomato, Ingredient::Gruyere, Ingredient::Ham,
+                   Ingredient::Mushrooms, Ingredient::Steak, Ingredient::Eggplant,
+                   Ingredient::GoatCheese, Ingredient::ChiefLove}) {
         CHECK(stock.available(i) == Stock::kInitialPerIngredient);
     }
 }

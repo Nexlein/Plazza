@@ -5,6 +5,7 @@
 ** test_pizza_flow
 */
 
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -12,8 +13,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-
-#include <catch2/catch_test_macros.hpp>
 
 #include "plazza/pizza/Pizza.hpp"
 #include "plazza/protocol/Frame.hpp"
@@ -44,9 +43,8 @@ namespace {
         }
     };
 
-    bool waitUntil(
-        FrameSink& sink, std::chrono::steady_clock::duration timeout,
-        const std::function<bool(const std::vector<AnyFrame>&)>& predicate)
+    bool waitUntil(FrameSink& sink, std::chrono::steady_clock::duration timeout,
+                   const std::function<bool(const std::vector<AnyFrame>&)>& predicate)
     {
         auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline) {
@@ -67,10 +65,14 @@ namespace {
     {
         Tally t;
         for (const auto& f : frames) {
-            if (std::holds_alternative<AcceptedFrame>(f)) ++t.accepted;
-            else if (std::holds_alternative<RejectedFrame>(f)) ++t.rejected;
-            else if (std::holds_alternative<CompletedFrame>(f)) ++t.completed;
-            else if (std::holds_alternative<StatusReplyFrame>(f)) ++t.statusReply;
+            if (std::holds_alternative<AcceptedFrame>(f))
+                ++t.accepted;
+            else if (std::holds_alternative<RejectedFrame>(f))
+                ++t.rejected;
+            else if (std::holds_alternative<CompletedFrame>(f))
+                ++t.completed;
+            else if (std::holds_alternative<StatusReplyFrame>(f))
+                ++t.statusReply;
         }
         return t;
     }
@@ -80,8 +82,7 @@ namespace {
 TEST_CASE("Pizza flow: 3 requests → 3 Accepted + 3 Completed", "[kitchen][protocol]")
 {
     const std::string base = "/tmp/plazza_test_pizza_flow";
-    Kitchen::Config cfg{
-        /*cookCount=*/2, /*cookingMultiplier=*/0.05F, /*restockMs=*/1000, base};
+    Kitchen::Config cfg{/*cookCount=*/2, /*cookingMultiplier=*/0.05F, /*restockMs=*/1000, base};
 
     FrameSink sink;
 
@@ -90,13 +91,14 @@ TEST_CASE("Pizza flow: 3 requests → 3 Accepted + 3 Completed", "[kitchen][prot
         handle.onFrame([&](const AnyFrame& f) { sink.push(f); });
 
         for (uint32_t idx = 0; idx < 3; ++idx)
-            handle.sendFrame(RequestFrame{
-                /*orderId=*/1, /*pizzaIdx=*/idx, PizzaType::Margarita, PizzaSize::M});
+            handle.sendFrame(
+                RequestFrame{/*orderId=*/1, /*pizzaIdx=*/idx, PizzaType::Margarita, PizzaSize::M});
 
-        REQUIRE(waitUntil(sink, 5s, [](const auto& frames) {
+        auto condition = [](const std::vector<AnyFrame>& frames) {
             auto t = tally(frames);
             return t.accepted == 3 && t.completed == 3;
-        }));
+        };
+        REQUIRE(waitUntil(sink, 5s, condition));
     }
 
     auto t = tally(sink.snapshot());
@@ -108,8 +110,7 @@ TEST_CASE("Pizza flow: 3 requests → 3 Accepted + 3 Completed", "[kitchen][prot
 TEST_CASE("Pizza flow: oversubscribed request is Rejected", "[kitchen][protocol]")
 {
     const std::string base = "/tmp/plazza_test_pizza_reject";
-    Kitchen::Config cfg{
-        /*cookCount=*/1, /*cookingMultiplier=*/0.2F, /*restockMs=*/1000, base};
+    Kitchen::Config cfg{/*cookCount=*/1, /*cookingMultiplier=*/0.2F, /*restockMs=*/1000, base};
 
     FrameSink sink;
 
@@ -118,13 +119,14 @@ TEST_CASE("Pizza flow: oversubscribed request is Rejected", "[kitchen][protocol]
         handle.onFrame([&](const AnyFrame& f) { sink.push(f); });
 
         for (uint32_t idx = 0; idx < 3; ++idx)
-            handle.sendFrame(RequestFrame{
-                /*orderId=*/9, /*pizzaIdx=*/idx, PizzaType::Margarita, PizzaSize::S});
+            handle.sendFrame(
+                RequestFrame{/*orderId=*/9, /*pizzaIdx=*/idx, PizzaType::Margarita, PizzaSize::S});
 
-        REQUIRE(waitUntil(sink, 5s, [](const auto& frames) {
+        auto condition = [](const std::vector<AnyFrame>& frames) {
             auto t = tally(frames);
             return (t.accepted + t.rejected) == 3 && t.completed == 2;
-        }));
+        };
+        REQUIRE(waitUntil(sink, 5s, condition));
     }
 
     auto t = tally(sink.snapshot());
@@ -133,12 +135,10 @@ TEST_CASE("Pizza flow: oversubscribed request is Rejected", "[kitchen][protocol]
     CHECK(t.completed == 2);
 }
 
-TEST_CASE("Pizza flow: StatusQuery replies with cook count and outstanding",
-          "[kitchen][protocol]")
+TEST_CASE("Pizza flow: StatusQuery replies with cook count and outstanding", "[kitchen][protocol]")
 {
     const std::string base = "/tmp/plazza_test_pizza_status";
-    Kitchen::Config cfg{
-        /*cookCount=*/3, /*cookingMultiplier=*/0.05F, /*restockMs=*/1000, base};
+    Kitchen::Config cfg{/*cookCount=*/3, /*cookingMultiplier=*/0.05F, /*restockMs=*/1000, base};
 
     FrameSink sink;
 
@@ -148,9 +148,8 @@ TEST_CASE("Pizza flow: StatusQuery replies with cook count and outstanding",
 
         handle.sendFrame(StatusQueryFrame{});
 
-        REQUIRE(waitUntil(sink, 2s, [](const auto& frames) {
-            return !frames.empty();
-        }));
+        auto condition = [](const std::vector<AnyFrame>& frames) { return !frames.empty(); };
+        REQUIRE(waitUntil(sink, 2s, condition));
     }
 
     auto frames = sink.snapshot();
@@ -159,4 +158,5 @@ TEST_CASE("Pizza flow: StatusQuery replies with cook count and outstanding",
     const auto& reply = std::get<StatusReplyFrame>(frames.front());
     CHECK(reply.cooksTotal == 3);
     CHECK(reply.outstanding == 0);
+    for (std::size_t i = 0; i < 9; ++i) CHECK(reply.stock[i] >= 5);
 }

@@ -8,8 +8,10 @@
 #include "plazza/reception/Reception.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <sstream>
+#include <thread>
 
 #include "plazza/core/ScopedLock.hpp"
 #include "plazza/pizza/Pizza.hpp"
@@ -23,7 +25,8 @@ namespace plazza::reception {
         : _cookingMultiplier(cookingMultiplier),
           _cooksPerKitchen(cooksPerKitchen),
           _restockMs(restockMs),
-          _dispatcherThread(nullptr)
+          _dispatcherThread(nullptr),
+          _reaperThread(nullptr)
     {
     }
 
@@ -32,9 +35,9 @@ namespace plazza::reception {
         _running = false;
         _pendingCv.notifyOne();
         if (_dispatcherThread) _dispatcherThread->join();
-        // Destroy kitchen handles (joining their reader threads) while _logger
-        // is still alive, since those threads log pizza completions.
-        _registry.clear();
+        if (_reaperThread) _reaperThread->join();
+        // _registry (declared after _logger) is destroyed first, joining the
+        // kitchen reader threads while the logger they write to is still alive.
     }
 
     int Reception::run()
@@ -45,15 +48,42 @@ namespace plazza::reception {
                << ", cooks=" << _cooksPerKitchen << ", restock_ms=" << _restockMs << ")";
         _logger->info(banner.str());
 
-        Shell shell(*_logger, std::cin, std::cout, [this](const Order& order) {
-            {
-                core::ScopedLock lock(&_pendingMutex);
-                _pending.push(order);
-            }
-            _pendingCv.notifyOne();
-        });
+        Shell shell(
+            *_logger, std::cin, std::cout,
+            [this](const Order& order) {
+                {
+                    core::ScopedLock lock(&_pendingMutex);
+                    _pending.push(order);
+                }
+                _pendingCv.notifyOne();
+            },
+            [this]() {
+                core::ScopedLock lock(&_registryMutex);
+                std::vector<KitchenHandle*> handles;
+                for (const auto& kr : _registry) handles.push_back(kr.handle.get());
+                return handles;
+            });
 
         dispatchOrders();
+
+        _reaperThread = std::make_unique<core::Thread>([this]() {
+            while (_running) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                if (!_running) break;
+
+                core::ScopedLock lock(&_registryMutex);
+                for (auto it = _registry.begin(); it != _registry.end();) {
+                    auto exitStatus = it->handle->tryWaitProcess();
+                    if (exitStatus.has_value()) {
+                        it = _registry.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+            }
+        });
+        _reaperThread->start();
+
         const int code = shell.run();
         _logger->info("reception shutting down");
         return code;

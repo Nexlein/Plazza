@@ -5,6 +5,7 @@
 ** test_cook_flow
 */
 
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -12,8 +13,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-
-#include <catch2/catch_test_macros.hpp>
 
 #include "plazza/pizza/Pizza.hpp"
 #include "plazza/protocol/Frame.hpp"
@@ -44,9 +43,8 @@ namespace {
         }
     };
 
-    bool waitUntil(
-        FrameSink& sink, std::chrono::steady_clock::duration timeout,
-        const std::function<bool(const std::vector<AnyFrame>&)>& predicate)
+    bool waitUntil(FrameSink& sink, std::chrono::steady_clock::duration timeout,
+                   const std::function<bool(const std::vector<AnyFrame>&)>& predicate)
     {
         auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline) {
@@ -79,8 +77,7 @@ TEST_CASE("Cook flow: real bake time honours multiplier", "[kitchen][cook][timin
     const std::string base = "/tmp/plazza_test_cook_timing";
     // Regina has baseBakeTime=2; with multiplier=0.5 we expect ~1000ms.
     // restockMs=0 keeps the restocker off so timing is purely the cook.
-    Kitchen::Config cfg{
-        /*cookCount=*/2, /*cookingMultiplier=*/0.5F, /*restockMs=*/0, base};
+    Kitchen::Config cfg{/*cookCount=*/2, /*cookingMultiplier=*/0.5F, /*restockMs=*/0, base};
 
     FrameSink sink;
     {
@@ -88,12 +85,11 @@ TEST_CASE("Cook flow: real bake time honours multiplier", "[kitchen][cook][timin
         handle.onFrame([&](const AnyFrame& f) { sink.push(f); });
 
         auto sent = std::chrono::steady_clock::now();
-        handle.sendFrame(RequestFrame{
-            /*orderId=*/1, /*pizzaIdx=*/0, PizzaType::Regina, PizzaSize::M});
+        handle.sendFrame(
+            RequestFrame{/*orderId=*/1, /*pizzaIdx=*/0, PizzaType::Regina, PizzaSize::M});
 
-        REQUIRE(waitUntil(sink, 3s, [](const auto& frames) {
-            return countCompleted(frames) == 1;
-        }));
+        auto cond = [](const std::vector<AnyFrame>& frames) { return countCompleted(frames) == 1; };
+        REQUIRE(waitUntil(sink, 3s, cond));
 
         auto elapsed = std::chrono::steady_clock::now() - sent;
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
@@ -102,14 +98,12 @@ TEST_CASE("Cook flow: real bake time honours multiplier", "[kitchen][cook][timin
     }
 }
 
-TEST_CASE("Cook flow: stock back-pressure resolves via restocker",
-          "[kitchen][cook][stock]")
+TEST_CASE("Cook flow: stock back-pressure resolves via restocker", "[kitchen][cook][stock]")
 {
     const std::string base = "/tmp/plazza_test_cook_backpressure";
     // 6 Reginas, each needs Ham. Initial Ham=5, so one cook must wait
     // for the restocker (period=80ms) before it can proceed.
-    Kitchen::Config cfg{
-        /*cookCount=*/4, /*cookingMultiplier=*/0.05F, /*restockMs=*/80, base};
+    Kitchen::Config cfg{/*cookCount=*/4, /*cookingMultiplier=*/0.05F, /*restockMs=*/80, base};
 
     FrameSink sink;
     {
@@ -117,12 +111,13 @@ TEST_CASE("Cook flow: stock back-pressure resolves via restocker",
         handle.onFrame([&](const AnyFrame& f) { sink.push(f); });
 
         for (uint32_t idx = 0; idx < 6; ++idx)
-            handle.sendFrame(RequestFrame{
-                /*orderId=*/7, /*pizzaIdx=*/idx, PizzaType::Regina, PizzaSize::M});
+            handle.sendFrame(
+                RequestFrame{/*orderId=*/7, /*pizzaIdx=*/idx, PizzaType::Regina, PizzaSize::M});
 
-        REQUIRE(waitUntil(sink, 5s, [](const auto& frames) {
+        auto cond0 = [](const std::vector<AnyFrame>& frames) {
             return countAccepted(frames) == 6 && countCompleted(frames) == 6;
-        }));
+        };
+        REQUIRE(waitUntil(sink, 5s, cond0));
     }
 
     auto frames = sink.snapshot();
@@ -137,8 +132,7 @@ TEST_CASE("Cook flow: shutdown wakes cooks parked on missing ingredients",
     // 8 Reginas saturate the 2*N=8 capacity; 8 cooks need Ham but only 5
     // initial units exist. With restockMs=0 the last 3 cooks would park
     // forever — Kitchen::~Kitchen must wake them via Stock::notifyAll.
-    Kitchen::Config cfg{
-        /*cookCount=*/4, /*cookingMultiplier=*/0.0F, /*restockMs=*/0, base};
+    Kitchen::Config cfg{/*cookCount=*/4, /*cookingMultiplier=*/0.0F, /*restockMs=*/0, base};
 
     FrameSink sink;
     auto t0 = std::chrono::steady_clock::now();
@@ -147,14 +141,15 @@ TEST_CASE("Cook flow: shutdown wakes cooks parked on missing ingredients",
         handle.onFrame([&](const AnyFrame& f) { sink.push(f); });
 
         for (uint32_t idx = 0; idx < 8; ++idx)
-            handle.sendFrame(RequestFrame{
-                /*orderId=*/3, /*pizzaIdx=*/idx, PizzaType::Regina, PizzaSize::L});
+            handle.sendFrame(
+                RequestFrame{/*orderId=*/3, /*pizzaIdx=*/idx, PizzaType::Regina, PizzaSize::L});
 
         // Wait until the kitchen has acked all 8 and completed the 5 that
         // could actually get ingredients. The remaining 3 are now parked.
-        REQUIRE(waitUntil(sink, 3s, [](const auto& frames) {
+        auto cond1 = [](const std::vector<AnyFrame>& frames) {
             return countAccepted(frames) == 8 && countCompleted(frames) >= 5;
-        }));
+        };
+        REQUIRE(waitUntil(sink, 3s, cond1));
     }
     auto elapsed = std::chrono::steady_clock::now() - t0;
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();

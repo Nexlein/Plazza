@@ -9,6 +9,7 @@
 
 #include <pthread.h>
 
+#include <atomic>
 #include <functional>
 #include <utility>
 
@@ -16,7 +17,7 @@ namespace plazza::core {
 
     class Thread {
         public:
-        enum class Status { NOT_STARTED, RUNNING, DEAD };
+        enum class Status { NOT_STARTED, RUNNING, DEAD, JOINED };
 
         template <typename Function, typename... Args>
         Thread(Function&& f, Args&&... args) : _status(Status::NOT_STARTED)
@@ -37,7 +38,7 @@ namespace plazza::core {
 
         private:
         pthread_t _thread;
-        Status _status;
+        std::atomic<Status> _status;
         std::function<void()> _task;
 
         static void* wrapper(void* thisPtr);

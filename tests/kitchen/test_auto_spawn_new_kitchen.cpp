@@ -5,6 +5,8 @@
 ** test_dispatch_balance
 */
 
+#include <algorithm>
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -12,9 +14,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <algorithm>
-
-#include <catch2/catch_test_macros.hpp>
 
 #include "plazza/pizza/Pizza.hpp"
 #include "plazza/protocol/Frame.hpp"
@@ -45,9 +44,8 @@ namespace {
         }
     };
 
-    bool waitUntil(
-        FrameSink& sink, std::chrono::steady_clock::duration timeout,
-        const std::function<bool(const std::vector<AnyFrame>&)>& predicate)
+    bool waitUntil(FrameSink& sink, std::chrono::steady_clock::duration timeout,
+                   const std::function<bool(const std::vector<AnyFrame>&)>& predicate)
     {
         auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline) {
@@ -67,18 +65,17 @@ namespace {
 
 }  // namespace
 
-TEST_CASE("Dispatch: saturated kitchen triggers exactly one new kitchen spawn",
-          "[dispatch][spawn]")
+TEST_CASE("Dispatch: saturated kitchen triggers exactly one new kitchen spawn", "[dispatch][spawn]")
 {
     std::system("rm -f /tmp/plazza_test_nospawn_0* /tmp/plazza_test_nospawn_1*");
     // cooks=3 → cap=6 ; on sature kitchen 0 avec 6 pizzas puis on envoie
     // une 7ème : elle doit partir sur une nouvelle kitchen (kitchen 1).
     const std::size_t cooks = 3;
 
+    FrameSink sink0, sink1;
     KitchenHandle h0({cooks, 0.05F, 0, "/tmp/plazza_test_spawn_0"}, 0);
     KitchenHandle h1({cooks, 0.05F, 0, "/tmp/plazza_test_spawn_1"}, 1);
 
-    FrameSink sink0, sink1;
     h0.onFrame([&](const AnyFrame& f) { sink0.push(f); });
     h1.onFrame([&](const AnyFrame& f) { sink1.push(f); });
 
@@ -87,17 +84,15 @@ TEST_CASE("Dispatch: saturated kitchen triggers exactly one new kitchen spawn",
         h0.sendFrame(RequestFrame{1, idx, PizzaType::Margarita, PizzaSize::M});
 
     // Attendre que kitchen 0 ait bien accepté les 6
-    REQUIRE(waitUntil(sink0, 3s, [](const auto& frames) {
-        return countAccepted(frames) == 6;
-    }));
+    auto cond0 = [](const std::vector<AnyFrame>& frames) { return countAccepted(frames) == 6; };
+    REQUIRE(waitUntil(sink0, 3s, cond0));
 
     // Envoyer la 7ème pizza sur kitchen 1 (nouvelle kitchen spawnée)
     h1.sendFrame(RequestFrame{2, 0, PizzaType::Margarita, PizzaSize::M});
 
     // kitchen 1 doit accepter la pizza
-    REQUIRE(waitUntil(sink1, 2s, [](const auto& frames) {
-        return countAccepted(frames) == 1;
-    }));
+    auto cond1 = [](const std::vector<AnyFrame>& frames) { return countAccepted(frames) == 1; };
+    REQUIRE(waitUntil(sink1, 2s, cond1));
 
     // kitchen 0 ne doit pas avoir reçu de pizza supplémentaire
     CHECK(countAccepted(sink0.snapshot()) == 6);

@@ -5,11 +5,12 @@
 ** test_conditionVariable
 */
 
+#include <catch2/catch_test_macros.hpp>
+#include <chrono>
+#include <thread>
+
 #include "plazza/core/ConditionVariable.hpp"
 #include "plazza/core/Mutex.hpp"
-#include <catch2/catch_test_macros.hpp>
-#include <thread>
-#include <chrono>
 
 TEST_CASE("ConditionVariable - notify wakes waiting thread")
 {
@@ -26,8 +27,7 @@ TEST_CASE("ConditionVariable - notify wakes waiting thread")
     });
 
     mutex.lock();
-    while (!ready)
-        cv.wait(mutex);
+    while (!ready) cv.wait(mutex);
     mutex.unlock();
 
     REQUIRE(ready == true);
@@ -101,16 +101,14 @@ TEST_CASE("ConditionVariable - producer consumer queue")
     std::thread consumer([&]() {
         while (true) {
             mutex.lock();
-            while (queue.empty() && !done)
-                cv.wait(mutex);
+            while (queue.empty() && !done) cv.wait(mutex);
             while (!queue.empty()) {
                 queue.pop_back();
                 consumed++;
             }
             bool finished = done;
             mutex.unlock();
-            if (finished)
-                break;
+            if (finished) break;
         }
     });
 

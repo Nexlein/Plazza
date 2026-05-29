@@ -16,10 +16,13 @@
 
 namespace plazza::reception {
 
+    class KitchenHandle;
+
     class Shell {
         public:
         Shell(Logger& logger, std::istream& in, std::ostream& out,
-              std::function<void(const Order&)> onOrder);
+              std::function<void(const Order&)> onOrder,
+              std::function<std::vector<KitchenHandle*>()> getKitchens);
 
         int run();
 
@@ -28,6 +31,7 @@ namespace plazza::reception {
         std::istream& _in;
         std::ostream& _out;
         std::function<void(const Order&)> _onOrder;
+        std::function<std::vector<KitchenHandle*>()> _getKitchens;
 
         void handleStatus();
         bool handleOrderLine(const std::string& line);

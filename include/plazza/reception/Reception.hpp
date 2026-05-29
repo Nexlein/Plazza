@@ -57,6 +57,7 @@ namespace plazza::reception {
         OrderTracker _orderTracker;
         core::Mutex _ioMutex;  // serialises user-facing stdout writes
         std::unique_ptr<core::Thread> _dispatcherThread;
+        std::unique_ptr<core::Thread> _reaperThread;
         std::queue<Order> _pending;
         core::Mutex _pendingMutex;
         std::vector<KitchenRegistry> _registry;

@@ -9,11 +9,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <future>
 #include <string>
-
-#include <catch2/catch_test_macros.hpp>
 
 #include "plazza/protocol/Frame.hpp"
 #include "plazza/reception/KitchenHandle.hpp"
@@ -36,8 +35,7 @@ namespace {
 TEST_CASE("KitchenHandle: spawn, ping/pong, clean shutdown", "[kitchen]")
 {
     const std::string base = "/tmp/plazza_test_kitchen_boot";
-    Kitchen::Config cfg{
-        /*cookCount=*/1, /*cookingMultiplier=*/1.0F, /*restockMs=*/1000, base};
+    Kitchen::Config cfg{/*cookCount=*/1, /*cookingMultiplier=*/1.0F, /*restockMs=*/1000, base};
 
     std::promise<AckFrame> ackPromise;
     auto ackFuture = ackPromise.get_future();
@@ -47,8 +45,7 @@ TEST_CASE("KitchenHandle: spawn, ping/pong, clean shutdown", "[kitchen]")
         CHECK(handle.pid() > 0);
 
         handle.onFrame([&](const AnyFrame& f) {
-            if (std::holds_alternative<AckFrame>(f))
-                ackPromise.set_value(std::get<AckFrame>(f));
+            if (std::holds_alternative<AckFrame>(f)) ackPromise.set_value(std::get<AckFrame>(f));
         });
 
         handle.sendFrame(HeartbeatFrame{/*token=*/0xDEADBEEFu});

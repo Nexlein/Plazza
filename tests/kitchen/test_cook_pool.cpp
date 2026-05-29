@@ -6,10 +6,9 @@
 */
 
 #include <atomic>
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <thread>
-
-#include <catch2/catch_test_macros.hpp>
 
 #include "plazza/kitchen/Kitchen.hpp"
 #include "plazza/pizza/Pizza.hpp"
@@ -34,9 +33,9 @@ TEST_CASE("Kitchen::tryAccept respects 2 x N capacity gate", "[kitchen][cooks]")
 {
     // N=3, multiplier 0.1 → Margarita (baseBakeTime=1s) sleeps ~100ms per cook,
     // long enough for the 7th tryAccept call to land while all six are in-flight.
+    std::atomic<int> completed{0};
     Kitchen k(makeCfg(3, 0.1F));
 
-    std::atomic<int> completed{0};
     k.setOnComplete([&](const Pizza&, uint32_t, uint32_t) { completed.fetch_add(1); });
 
     const Pizza pizza = makePizza(PizzaType::Margarita, PizzaSize::M);
@@ -67,8 +66,8 @@ TEST_CASE("Kitchen::tryAccept respects 2 x N capacity gate", "[kitchen][cooks]")
 
 TEST_CASE("Kitchen with N=1 rejects after 2 pizzas in flight", "[kitchen][cooks]")
 {
-    Kitchen k(makeCfg(1, 0.1F));
     std::atomic<int> completed{0};
+    Kitchen k(makeCfg(1, 0.1F));
     k.setOnComplete([&](const Pizza&, uint32_t, uint32_t) { completed.fetch_add(1); });
 
     const Pizza pizza = makePizza(PizzaType::Regina, PizzaSize::L);

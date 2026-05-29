@@ -47,10 +47,8 @@ TEST_CASE("Frame: Request round-trip", "[protocol]")
 TEST_CASE("Frame: Request covers every PizzaType and PizzaSize", "[protocol]")
 {
     for (auto t :
-         {PizzaType::Regina, PizzaType::Margarita, PizzaType::Americana,
-          PizzaType::Fantasia}) {
-        for (auto s :
-             {PizzaSize::S, PizzaSize::M, PizzaSize::L, PizzaSize::XL, PizzaSize::XXL}) {
+         {PizzaType::Regina, PizzaType::Margarita, PizzaType::Americana, PizzaType::Fantasia}) {
+        for (auto s : {PizzaSize::S, PizzaSize::M, PizzaSize::L, PizzaSize::XL, PizzaSize::XXL}) {
             auto frame = decode(encode(RequestFrame{1, 0, t, s}));
             REQUIRE(std::holds_alternative<RequestFrame>(frame));
             const auto& out = std::get<RequestFrame>(frame);

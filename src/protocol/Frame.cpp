@@ -78,6 +78,7 @@ namespace plazza::protocol {
     {
         plazza::core::SerialBuffer body;
         body << frame.cooksTotal << frame.outstanding;
+        for (uint32_t s : frame.stock) body << s;
         return finish(FrameKind::StatusReply, body);
     }
 
@@ -135,6 +136,7 @@ namespace plazza::protocol {
             case FrameKind::StatusReply: {
                 StatusReplyFrame frame;
                 body >> frame.cooksTotal >> frame.outstanding;
+                for (std::size_t i = 0; i < 9; ++i) body >> frame.stock[i];
                 return frame;
             }
             default:
