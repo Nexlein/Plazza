@@ -6,10 +6,9 @@
 */
 
 #include <atomic>
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <thread>
-
-#include <catch2/catch_test_macros.hpp>
 
 #include "plazza/kitchen/Kitchen.hpp"
 #include "plazza/pizza/Pizza.hpp"

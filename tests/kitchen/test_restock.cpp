@@ -6,10 +6,9 @@
 */
 
 #include <atomic>
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <thread>
-
-#include <catch2/catch_test_macros.hpp>
 
 #include "plazza/kitchen/Restocker.hpp"
 #include "plazza/kitchen/Stock.hpp"
@@ -78,8 +77,7 @@ TEST_CASE("Restocker wakes a parked waiter", "[restock][blocking]")
 
     std::atomic<bool> stop{false};
     std::atomic<bool> consumed{false};
-    std::thread waiter(
-        [&]() { consumed.store(stock.waitAndConsume(margarita, stop)); });
+    std::thread waiter([&]() { consumed.store(stock.waitAndConsume(margarita, stop)); });
 
     restocker.start();
 

@@ -13,7 +13,8 @@ using namespace plazza::core;
 using namespace plazza::reception;
 using namespace plazza::pizza;
 
-TEST_CASE("SerialBuffer round-trip Order") {
+TEST_CASE("SerialBuffer round-trip Order")
+{
     SerialBuffer buf;
     Order original{PizzaType::Regina, PizzaSize::XL, 3};
     buf << original;
@@ -25,7 +26,8 @@ TEST_CASE("SerialBuffer round-trip Order") {
     CHECK(received.count == original.count);
 }
 
-TEST_CASE("SerialBuffer round-trip multiple Orders") {
+TEST_CASE("SerialBuffer round-trip multiple Orders")
+{
     SerialBuffer buf;
     Order o1{PizzaType::Regina, PizzaSize::XL, 3};
     Order o2{PizzaType::Margarita, PizzaSize::S, 1};
@@ -39,7 +41,8 @@ TEST_CASE("SerialBuffer round-trip multiple Orders") {
     CHECK(r2.count == o2.count);
 }
 
-TEST_CASE("SerialBuffer count boundary") {
+TEST_CASE("SerialBuffer count boundary")
+{
     SerialBuffer buf;
     Order original{PizzaType::Fantasia, PizzaSize::XXL, std::numeric_limits<std::size_t>::max()};
     buf << original;
@@ -49,8 +52,10 @@ TEST_CASE("SerialBuffer count boundary") {
     CHECK(received.count == original.count);
 }
 
-TEST_CASE("SerialBuffer all PizzaTypes round-trip") {
-    for (auto type : {PizzaType::Regina, PizzaType::Margarita, PizzaType::Americana, PizzaType::Fantasia}) {
+TEST_CASE("SerialBuffer all PizzaTypes round-trip")
+{
+    for (auto type :
+         {PizzaType::Regina, PizzaType::Margarita, PizzaType::Americana, PizzaType::Fantasia}) {
         SerialBuffer buf;
         Order original{type, PizzaSize::M, 2};
         buf << original;

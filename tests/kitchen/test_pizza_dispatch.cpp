@@ -5,6 +5,8 @@
 ** test_dispatch_balance
 */
 
+#include <algorithm>
+#include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -12,9 +14,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <algorithm>
-
-#include <catch2/catch_test_macros.hpp>
 
 #include "plazza/pizza/Pizza.hpp"
 #include "plazza/protocol/Frame.hpp"
@@ -45,9 +44,8 @@ namespace {
         }
     };
 
-    bool waitUntil(
-        FrameSink& sink, std::chrono::steady_clock::duration timeout,
-        const std::function<bool(const std::vector<AnyFrame>&)>& predicate)
+    bool waitUntil(FrameSink& sink, std::chrono::steady_clock::duration timeout,
+                   const std::function<bool(const std::vector<AnyFrame>&)>& predicate)
     {
         auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline) {
@@ -67,17 +65,13 @@ namespace {
 
 }  // namespace
 
-TEST_CASE("Dispatch: 9 pizzas across 3 kitchens are balanced within ±1",
-          "[dispatch][balance]")
+TEST_CASE("Dispatch: 9 pizzas across 3 kitchens are balanced within ±1", "[dispatch][balance]")
 {
     // 3 kitchens, cooks=3 → cap=6 each
     // On envoie 3 pizzas par kitchen manuellement pour simuler le dispatch balancé
     const std::size_t cooks = 3;
-    std::vector<std::string> bases = {
-        "/tmp/plazza_test_balance_0",
-        "/tmp/plazza_test_balance_1",
-        "/tmp/plazza_test_balance_2"
-    };
+    std::vector<std::string> bases = {"/tmp/plazza_test_balance_0", "/tmp/plazza_test_balance_1",
+                                      "/tmp/plazza_test_balance_2"};
 
     Kitchen::Config cfg0{cooks, 0.05F, 0, bases[0]};
     Kitchen::Config cfg1{cooks, 0.05F, 0, bases[1]};
@@ -113,9 +107,8 @@ TEST_CASE("Dispatch: 9 pizzas across 3 kitchens are balanced within ±1",
 
     // Attendre que les 9 soient acceptées
     FrameSink combined;
-    REQUIRE(waitUntil(combined, 3s, [&](const auto&) {
-        return accepted[0] + accepted[1] + accepted[2] == 9;
-    }));
+    REQUIRE(waitUntil(combined, 3s,
+                      [&](const auto&) { return accepted[0] + accepted[1] + accepted[2] == 9; }));
 
     // Distribution within ±1 : max - min <= 1
     int mn = *std::min_element(accepted.begin(), accepted.end());
@@ -123,8 +116,7 @@ TEST_CASE("Dispatch: 9 pizzas across 3 kitchens are balanced within ±1",
     CHECK(mx - mn <= 1);
 }
 
-TEST_CASE("Dispatch: saturated kitchen does not block others",
-          "[dispatch][saturation]")
+TEST_CASE("Dispatch: saturated kitchen does not block others", "[dispatch][saturation]")
 {
     // kitchen 0 saturée (cap=6, on envoie 6), kitchen 1 libre
     // kitchen 1 doit pouvoir accepter sans attendre kitchen 0
@@ -145,7 +137,5 @@ TEST_CASE("Dispatch: saturated kitchen does not block others",
     h1.sendFrame(RequestFrame{2, 0, PizzaType::Margarita, PizzaSize::M});
 
     // kitchen 1 doit accepter rapidement, indépendamment de kitchen 0
-    REQUIRE(waitUntil(sink1, 2s, [](const auto& frames) {
-        return countAccepted(frames) == 1;
-    }));
+    REQUIRE(waitUntil(sink1, 2s, [](const auto& frames) { return countAccepted(frames) == 1; }));
 }
