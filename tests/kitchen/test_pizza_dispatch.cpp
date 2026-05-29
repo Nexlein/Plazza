@@ -78,24 +78,14 @@ TEST_CASE("Dispatch: 9 pizzas across 3 kitchens are balanced within ±1", "[disp
     Kitchen::Config cfg2{cooks, 0.05F, 0, bases[2]};
 
     std::vector<FrameSink> sinks(3);
-    std::vector<int> accepted(3, 0);
 
     KitchenHandle h0(cfg0, 0);
     KitchenHandle h1(cfg1, 1);
     KitchenHandle h2(cfg2, 2);
 
-    h0.onFrame([&](const AnyFrame& f) {
-        sinks[0].push(f);
-        if (std::holds_alternative<AcceptedFrame>(f)) accepted[0]++;
-    });
-    h1.onFrame([&](const AnyFrame& f) {
-        sinks[1].push(f);
-        if (std::holds_alternative<AcceptedFrame>(f)) accepted[1]++;
-    });
-    h2.onFrame([&](const AnyFrame& f) {
-        sinks[2].push(f);
-        if (std::holds_alternative<AcceptedFrame>(f)) accepted[2]++;
-    });
+    h0.onFrame([&](const AnyFrame& f) { sinks[0].push(f); });
+    h1.onFrame([&](const AnyFrame& f) { sinks[1].push(f); });
+    h2.onFrame([&](const AnyFrame& f) { sinks[2].push(f); });
 
     // Dispatch balancé : 3 pizzas par kitchen = 9 total
     for (uint32_t idx = 0; idx < 3; ++idx)
@@ -107,12 +97,19 @@ TEST_CASE("Dispatch: 9 pizzas across 3 kitchens are balanced within ±1", "[disp
 
     // Attendre que les 9 soient acceptées
     FrameSink combined;
-    REQUIRE(waitUntil(combined, 3s,
-                      [&](const auto&) { return accepted[0] + accepted[1] + accepted[2] == 9; }));
+    auto cond = [&](const std::vector<AnyFrame>&) {
+        return countAccepted(sinks[0].snapshot()) +
+               countAccepted(sinks[1].snapshot()) +
+               countAccepted(sinks[2].snapshot()) == 9;
+    };
+    REQUIRE(waitUntil(combined, 3s, cond));
 
     // Distribution within ±1 : max - min <= 1
-    int mn = *std::min_element(accepted.begin(), accepted.end());
-    int mx = *std::max_element(accepted.begin(), accepted.end());
+    int a0 = countAccepted(sinks[0].snapshot());
+    int a1 = countAccepted(sinks[1].snapshot());
+    int a2 = countAccepted(sinks[2].snapshot());
+    int mn = std::min({a0, a1, a2});
+    int mx = std::max({a0, a1, a2});
     CHECK(mx - mn <= 1);
 }
 
@@ -122,10 +119,10 @@ TEST_CASE("Dispatch: saturated kitchen does not block others", "[dispatch][satur
     // kitchen 1 doit pouvoir accepter sans attendre kitchen 0
     const std::size_t cooks = 3;
 
+    FrameSink sink0, sink1;
     KitchenHandle h0({cooks, 0.05F, 0, "/tmp/plazza_test_sat_0"}, 0);
     KitchenHandle h1({cooks, 0.05F, 0, "/tmp/plazza_test_sat_1"}, 1);
 
-    FrameSink sink0, sink1;
     h0.onFrame([&](const AnyFrame& f) { sink0.push(f); });
     h1.onFrame([&](const AnyFrame& f) { sink1.push(f); });
 
@@ -137,5 +134,6 @@ TEST_CASE("Dispatch: saturated kitchen does not block others", "[dispatch][satur
     h1.sendFrame(RequestFrame{2, 0, PizzaType::Margarita, PizzaSize::M});
 
     // kitchen 1 doit accepter rapidement, indépendamment de kitchen 0
-    REQUIRE(waitUntil(sink1, 2s, [](const auto& frames) { return countAccepted(frames) == 1; }));
+    auto cond = [](const std::vector<AnyFrame>& frames) { return countAccepted(frames) == 1; };
+    REQUIRE(waitUntil(sink1, 2s, cond));
 }

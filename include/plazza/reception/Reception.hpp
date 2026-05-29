@@ -44,6 +44,7 @@ namespace plazza::reception {
         std::size_t _restockMs;
         std::string _logPath = "plazza.log";
         std::unique_ptr<core::Thread> _dispatcherThread;
+        std::unique_ptr<core::Thread> _reaperThread;
         std::queue<Order> _pending;
         core::Mutex _pendingMutex;
         std::vector<KitchenRegistry> _registry;

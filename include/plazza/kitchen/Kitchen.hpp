@@ -68,6 +68,8 @@ namespace plazza::kitchen {
         Stock _stock;
         Restocker _restocker;
         std::unique_ptr<plazza::core::ThreadPool> _pool;
+        std::atomic<long long> _lastActiveTimeMs{0};
+        std::unique_ptr<plazza::core::Thread> _idleThread;
     };
 
 }  // namespace plazza::kitchen

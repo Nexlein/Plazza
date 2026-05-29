@@ -7,6 +7,10 @@
 
 #include "plazza/kitchen/Kitchen.hpp"
 
+#include <unistd.h>
+
+#include <thread>
+
 #include "plazza/core/ScopedLock.hpp"
 #include "plazza/kitchen/Cook.hpp"
 #include "plazza/pizza/Pizza.hpp"
@@ -20,6 +24,9 @@ namespace plazza::kitchen {
           _pool(std::make_unique<plazza::core::ThreadPool>(_cfg.cookCount))
     {
         if (_cfg.restockMs > 0) _restocker.start();
+        using namespace std::chrono;
+        _lastActiveTimeMs =
+            duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
     }
 
     Kitchen::~Kitchen()
@@ -27,6 +34,7 @@ namespace plazza::kitchen {
         // Wake any cook parked in Stock::waitAndConsume so _pool can join them.
         _shuttingDown.store(true);
         _stock.notifyAll();
+        if (_idleThread) _idleThread->join();
     }
 
     bool Kitchen::tryAccept(plazza::pizza::Pizza pizza, uint32_t orderId, uint32_t pizzaIdx)
@@ -45,6 +53,12 @@ namespace plazza::kitchen {
             {
                 plazza::core::ScopedLock lock(&_capMutex);
                 if (_outstanding > 0) --_outstanding;
+                if (_outstanding == 0) {
+                    using namespace std::chrono;
+                    _lastActiveTimeMs.store(
+                        duration_cast<milliseconds>(steady_clock::now().time_since_epoch())
+                            .count());
+                }
             }
             if (_onComplete) {
                 try {
@@ -73,6 +87,26 @@ namespace plazza::kitchen {
             setOnComplete([this](const plazza::pizza::Pizza&, uint32_t orderId, uint32_t pizzaIdx) {
                 sendFrame(plazza::protocol::CompletedFrame{orderId, pizzaIdx});
             });
+
+            auto nowMs = []() {
+                using namespace std::chrono;
+                return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+            };
+
+            _idleThread = std::make_unique<plazza::core::Thread>([this, nowMs]() {
+                while (!_shuttingDown.load()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                    if (_shuttingDown.load()) break;
+
+                    long long lastActive = _lastActiveTimeMs.load();
+                    long long now = nowMs();
+                    if (outstanding() == 0 && (now - lastActive >= 5000)) {
+                        if (_channel) _channel->closeWrite();
+                        _exit(0);
+                    }
+                }
+            });
+            _idleThread->start();
 
             while (true) {
                 auto raw = _channel->recv();

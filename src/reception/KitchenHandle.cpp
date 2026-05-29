@@ -85,6 +85,12 @@ namespace plazza::reception {
         return _lastStatusReply;
     }
 
+    std::optional<int> KitchenHandle::tryWaitProcess()
+    {
+        if (_process) return _process->tryWait();
+        return std::nullopt;
+    }
+
     pid_t KitchenHandle::pid() const { return _process ? _process->getPid() : -1; }
 
     void KitchenHandle::readerLoop()
