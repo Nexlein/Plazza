@@ -11,6 +11,8 @@
 #include <string>
 #include <string_view>
 
+#include "plazza/core/Mutex.hpp"
+
 namespace plazza::reception {
 
     class Logger {
@@ -28,6 +30,9 @@ namespace plazza::reception {
         private:
         std::ofstream _file;
         bool _mirrorStdout;
+        // Serialises write() so concurrent loggers (kitchen reader threads, the
+        // dispatcher and the shell) never interleave a single log line.
+        core::Mutex _mutex;
 
         void write(std::string_view level, std::string_view message);
     };

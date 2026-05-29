@@ -13,6 +13,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "plazza/core/ScopedLock.hpp"
+
 namespace plazza::reception {
 
     namespace {
@@ -55,6 +57,7 @@ namespace plazza::reception {
         std::ostringstream line;
         line << '[' << timestamp() << "] [" << level << "] " << message << '\n';
         const std::string text = line.str();
+        core::ScopedLock lock(&_mutex);
         if (_file.is_open()) {
             _file << text;
             _file.flush();

@@ -26,8 +26,7 @@ namespace plazza::reception {
           _cooksPerKitchen(cooksPerKitchen),
           _restockMs(restockMs),
           _dispatcherThread(nullptr),
-          _reaperThread(nullptr),
-          _orderId(0)
+          _reaperThread(nullptr)
     {
     }
 
@@ -37,18 +36,20 @@ namespace plazza::reception {
         _pendingCv.notifyOne();
         if (_dispatcherThread) _dispatcherThread->join();
         if (_reaperThread) _reaperThread->join();
+        // _registry (declared after _logger) is destroyed first, joining the
+        // kitchen reader threads while the logger they write to is still alive.
     }
 
     int Reception::run()
     {
-        Logger logger(_logPath, /*mirrorStdout=*/false);
+        _logger = std::make_unique<Logger>(_logPath, /*mirrorStdout=*/false);
         std::ostringstream banner;
         banner << "reception ready (multiplier=" << _cookingMultiplier
                << ", cooks=" << _cooksPerKitchen << ", restock_ms=" << _restockMs << ")";
-        logger.info(banner.str());
+        _logger->info(banner.str());
 
         Shell shell(
-            logger, std::cin, std::cout,
+            *_logger, std::cin, std::cout,
             [this](const Order& order) {
                 {
                     core::ScopedLock lock(&_pendingMutex);
@@ -63,7 +64,7 @@ namespace plazza::reception {
                 return handles;
             });
 
-        dispatchOrders(logger);
+        dispatchOrders();
 
         _reaperThread = std::make_unique<core::Thread>([this]() {
             while (_running) {
@@ -84,7 +85,7 @@ namespace plazza::reception {
         _reaperThread->start();
 
         const int code = shell.run();
-        logger.info("reception shutting down");
+        _logger->info("reception shutting down");
         return code;
     }
 
@@ -98,31 +99,58 @@ namespace plazza::reception {
             .channelBasePath = "/tmp/plazza_kitchen_" + std::to_string(id)};
         _registry.push_back({id, 0, std::make_unique<KitchenHandle>(cfg, id)});
         _registry.back().handle->onFrame([this, id](const protocol::AnyFrame& frame) {
-            core::ScopedLock lock(&_registryMutex);
-            auto it = std::find_if(_registry.begin(), _registry.end(),
-                                   [id](const KitchenRegistry& kr) { return kr.id == id; });
-            if (it == _registry.end()) return;
-
-            if (std::holds_alternative<protocol::CompletedFrame>(frame))
-                it->occupiedSlots--;
-            else if (std::holds_alternative<protocol::RejectedFrame>(frame))
-                it->occupiedSlots--;
+            if (std::holds_alternative<protocol::CompletedFrame>(frame)) {
+                const auto& done = std::get<protocol::CompletedFrame>(frame);
+                releaseSlot(id);
+                handleCompleted(done.orderId);
+            } else if (std::holds_alternative<protocol::RejectedFrame>(frame)) {
+                const auto& rejected = std::get<protocol::RejectedFrame>(frame);
+                releaseSlot(id);
+                std::ostringstream msg;
+                msg << "kitchen " << id << " rejected order #" << rejected.orderId;
+                _logger->warn(msg.str());
+            }
         });
     }
 
-    // update les occupations des kitchens dans le registry
-    void Reception::dispatchOrders([[maybe_unused]] Logger& logger)
+    void Reception::releaseSlot(std::size_t kitchenId)
+    {
+        core::ScopedLock lock(&_registryMutex);
+        auto it =
+            std::find_if(_registry.begin(), _registry.end(),
+                         [kitchenId](const KitchenRegistry& kr) { return kr.id == kitchenId; });
+        if (it != _registry.end() && it->occupiedSlots > 0) --it->occupiedSlots;
+    }
+
+    void Reception::handleCompleted(uint32_t orderId)
+    {
+        const OrderTracker::Update update = _orderTracker.complete(orderId);
+        if (!update.known) return;
+
+        core::ScopedLock lock(&_ioMutex);
+        std::cout << update.pizzaLine << '\n';
+        _logger->info(update.pizzaLine);
+        if (update.orderComplete) {
+            std::cout << update.orderLine << '\n';
+            _logger->info(update.orderLine);
+        }
+        std::cout.flush();
+    }
+
+    void Reception::dispatchOrders()
     {
         _dispatcherThread = std::make_unique<core::Thread>([this]() {
             while (_running) {
                 Order order;
                 {
                     core::ScopedLock lock(&_pendingMutex);
-                    while (_running && _pending.empty()) _pendingCv.wait(_pendingMutex);
-                    if (!_running) break;
+                    while (_pending.empty() && _running) _pendingCv.wait(_pendingMutex);
+                    if (!_running) return;
                     order = _pending.front();
                     _pending.pop();
                 }
+
+                const uint32_t orderId = _orderTracker.add(order.count, order.type, order.size);
 
                 for (std::size_t i = 0; i < order.count; i++) {
                     pizza::Pizza pizza = pizza::makePizza(order.type, order.size);
@@ -140,7 +168,7 @@ namespace plazza::reception {
                         best = &_registry.back();
                     }
                     best->handle->sendFrame(
-                        protocol::RequestFrame{.orderId = ++_orderId,
+                        protocol::RequestFrame{.orderId = orderId,
                                                .pizzaIdx = static_cast<uint32_t>(i),
                                                .type = pizza.type,
                                                .size = pizza.size});
