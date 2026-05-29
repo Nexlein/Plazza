@@ -28,8 +28,9 @@ namespace plazza::reception {
 
     }  // namespace
 
-    Shell::Shell(Logger& logger, std::istream& in, std::ostream& out)
-        : _logger(logger), _in(in), _out(out)
+    Shell::Shell(Logger& logger, std::istream& in, std::ostream& out,
+                 std::function<void(const Order&)> onOrder)
+        : _logger(logger), _in(in), _out(out), _onOrder(onOrder)
     {
     }
 
@@ -68,7 +69,7 @@ namespace plazza::reception {
         std::size_t total = 0;
         for (const auto& order : *parsed) {
             total += order.count;
-            _pending.push(order);
+            _onOrder(order);
         }
         std::ostringstream msg;
         msg << "received: " << total << " pizza(s) accepted";

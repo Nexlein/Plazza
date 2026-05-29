@@ -7,9 +7,12 @@
 
 #include "plazza/reception/Reception.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <sstream>
 
+#include "plazza/core/ScopedLock.hpp"
+#include "plazza/pizza/Pizza.hpp"
 #include "plazza/reception/Logger.hpp"
 #include "plazza/reception/Shell.hpp"
 
@@ -19,8 +22,17 @@ namespace plazza::reception {
                          std::size_t restockMs)
         : _cookingMultiplier(cookingMultiplier),
           _cooksPerKitchen(cooksPerKitchen),
-          _restockMs(restockMs)
+          _restockMs(restockMs),
+          _dispatcherThread(nullptr),
+          _orderId(0)
     {
+    }
+
+    Reception::~Reception()
+    {
+        _running = false;
+        _pendingCv.notifyOne();
+        if (_dispatcherThread) _dispatcherThread->join();
     }
 
     int Reception::run()
@@ -31,10 +43,80 @@ namespace plazza::reception {
                << ", cooks=" << _cooksPerKitchen << ", restock_ms=" << _restockMs << ")";
         logger.info(banner.str());
 
-        Shell shell(logger, std::cin, std::cout);
+        Shell shell(logger, std::cin, std::cout, [this](const Order& order) {
+            {
+                core::ScopedLock lock(&_pendingMutex);
+                _pending.push(order);
+            }
+            _pendingCv.notifyOne();
+        });
+
+        dispatchOrders(logger);
         const int code = shell.run();
         logger.info("reception shutting down");
         return code;
+    }
+
+    void Reception::spawnKitchen()
+    {
+        std::size_t id = _registry.size();
+        kitchen::Kitchen::Config cfg = {
+            .cookCount = _cooksPerKitchen,
+            .cookingMultiplier = _cookingMultiplier,
+            .restockMs = _restockMs,
+            .channelBasePath = "/tmp/plazza_kitchen_" + std::to_string(id)};
+        _registry.push_back({id, 0, std::make_unique<KitchenHandle>(cfg, id)});
+        _registry.back().handle->onFrame([this, id](const protocol::AnyFrame& frame) {
+            core::ScopedLock lock(&_registryMutex);
+            auto it = std::find_if(_registry.begin(), _registry.end(),
+                                   [id](const KitchenRegistry& kr) { return kr.id == id; });
+            if (it == _registry.end()) return;
+
+            if (std::holds_alternative<protocol::CompletedFrame>(frame))
+                it->occupiedSlots--;
+            else if (std::holds_alternative<protocol::RejectedFrame>(frame))
+                it->occupiedSlots--;
+        });
+    }
+
+    // update les occupations des kitchens dans le registry
+    void Reception::dispatchOrders(Logger& logger)
+    {
+        _dispatcherThread = std::make_unique<core::Thread>([this, &logger]() {
+            while (_running) {
+                Order order;
+                {
+                    core::ScopedLock lock(&_pendingMutex);
+                    while (_pending.empty()) _pendingCv.wait(_pendingMutex);
+                    order = _pending.front();
+                    _pending.pop();
+                }
+
+                for (int i = 0; i < order.count; i++) {
+                    pizza::Pizza pizza = pizza::makePizza(order.type, order.size);
+                    core::ScopedLock lock(&_registryMutex);
+
+                    KitchenRegistry* best = nullptr;
+                    for (KitchenRegistry& kr : _registry) {
+                        if (!best || kr.occupiedSlots < best->occupiedSlots ||
+                            (kr.occupiedSlots == best->occupiedSlots && kr.id < best->id))
+                            best = &kr;
+                    }
+
+                    if (!best || best->occupiedSlots >= _cooksPerKitchen * 2) {
+                        spawnKitchen();
+                        best = &_registry.back();
+                    }
+                    best->handle->sendFrame(
+                        protocol::RequestFrame{.orderId = ++_orderId,
+                                               .pizzaIdx = static_cast<uint32_t>(i),
+                                               .type = pizza.type,
+                                               .size = pizza.size});
+                    best->occupiedSlots++;
+                }
+            }
+        });
+        _dispatcherThread->start();
     }
 
 }  // namespace plazza::reception
