@@ -62,6 +62,9 @@ target_link_libraries(test_pizza_dispatch PRIVATE plazza_core Catch2::Catch2With
 add_executable(test_auto_spawn_new_kitchen kitchen/test_auto_spawn_new_kitchen.cpp)
 target_link_libraries(test_auto_spawn_new_kitchen PRIVATE plazza_core Catch2::Catch2WithMain)
 
+add_executable(test_order_tracker reception/test_order_tracker.cpp)
+target_link_libraries(test_order_tracker PRIVATE plazza_core Catch2::Catch2WithMain)
+
 include(CTest)
 include(Catch)
 catch_discover_tests(test_pizza_recipe)
@@ -78,3 +81,4 @@ catch_discover_tests(test_restock)
 catch_discover_tests(test_cook_flow)
 catch_discover_tests(test_pizza_dispatch)
 catch_discover_tests(test_auto_spawn_new_kitchen)
+catch_discover_tests(test_order_tracker)
