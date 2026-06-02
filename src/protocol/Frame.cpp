@@ -79,6 +79,9 @@ namespace plazza::protocol {
         plazza::core::SerialBuffer body;
         body << frame.cooksTotal << frame.outstanding;
         for (uint32_t s : frame.stock) body << s;
+        body << static_cast<uint32_t>(frame.cooks.size());
+        for (const auto& c : frame.cooks)
+            body << static_cast<uint32_t>(c.state) << c.type << c.size << c.elapsedMs << c.totalMs;
         return finish(FrameKind::StatusReply, body);
     }
 
@@ -137,6 +140,14 @@ namespace plazza::protocol {
                 StatusReplyFrame frame;
                 body >> frame.cooksTotal >> frame.outstanding;
                 for (std::size_t i = 0; i < 9; ++i) body >> frame.stock[i];
+                uint32_t cookCount = 0;
+                body >> cookCount;
+                frame.cooks.resize(cookCount);
+                for (auto& c : frame.cooks) {
+                    uint32_t state = 0;
+                    body >> state >> c.type >> c.size >> c.elapsedMs >> c.totalMs;
+                    c.state = static_cast<CookState>(state);
+                }
                 return frame;
             }
             default:

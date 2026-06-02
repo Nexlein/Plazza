@@ -8,6 +8,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <queue>
 #include <string>
@@ -17,6 +18,7 @@
 #include "plazza/core/Mutex.hpp"
 #include "plazza/core/Thread.hpp"
 #include "plazza/reception/KitchenHandle.hpp"
+#include "plazza/reception/KitchenStatus.hpp"
 #include "plazza/reception/Logger.hpp"
 #include "plazza/reception/Order.hpp"
 #include "plazza/reception/OrderTracker.hpp"
@@ -25,11 +27,17 @@ namespace plazza::reception {
 
     class Reception {
         public:
-        Reception(float cookingMultiplier, std::size_t cooksPerKitchen, std::size_t restockMs);
+        Reception(float cookingMultiplier, std::size_t cooksPerKitchen, std::size_t restockMs,
+                  bool graphic = false);
         ~Reception();
 
         int run();
         void dispatchOrders();
+
+        // Queries every registered kitchen and returns a snapshot. Runs entirely
+        // under _registryMutex so the reaper cannot destroy a handle mid-query;
+        // used by the graphical renderer's poller thread.
+        std::vector<KitchenStatus> pollStatus();
 
         struct KitchenRegistry {
             std::size_t id;
@@ -50,6 +58,11 @@ namespace plazza::reception {
         float _cookingMultiplier;
         std::size_t _cooksPerKitchen;
         std::size_t _restockMs;
+        bool _graphic{false};
+        // When set (graphic mode), user-facing completion lines are routed here
+        // instead of std::cout so they don't corrupt the libcaca canvas. Guarded
+        // by _ioMutex, which already serialises user-facing output.
+        std::function<void(const std::string&)> _uiEventSink;
         std::string _logPath = "plazza.log";
         // _logger is declared before _registry so it outlives the kitchen
         // reader threads (which log completions) during teardown.

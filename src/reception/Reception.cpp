@@ -17,14 +17,16 @@
 #include "plazza/pizza/Pizza.hpp"
 #include "plazza/reception/Logger.hpp"
 #include "plazza/reception/Shell.hpp"
+#include "plazza/render/Renderer.hpp"
 
 namespace plazza::reception {
 
     Reception::Reception(float cookingMultiplier, std::size_t cooksPerKitchen,
-                         std::size_t restockMs)
+                         std::size_t restockMs, bool graphic)
         : _cookingMultiplier(cookingMultiplier),
           _cooksPerKitchen(cooksPerKitchen),
           _restockMs(restockMs),
+          _graphic(graphic),
           _dispatcherThread(nullptr),
           _reaperThread(nullptr)
     {
@@ -48,21 +50,13 @@ namespace plazza::reception {
                << ", cooks=" << _cooksPerKitchen << ", restock_ms=" << _restockMs << ")";
         _logger->info(banner.str());
 
-        Shell shell(
-            *_logger, std::cin, std::cout,
-            [this](const Order& order) {
-                {
-                    core::ScopedLock lock(&_pendingMutex);
-                    _pending.push(order);
-                }
-                _pendingCv.notifyOne();
-            },
-            [this]() {
-                core::ScopedLock lock(&_registryMutex);
-                std::vector<KitchenHandle*> handles;
-                for (const auto& kr : _registry) handles.push_back(kr.handle.get());
-                return handles;
-            });
+        auto onOrder = [this](const Order& order) {
+            {
+                core::ScopedLock lock(&_pendingMutex);
+                _pending.push(order);
+            }
+            _pendingCv.notifyOne();
+        };
 
         dispatchOrders();
 
@@ -84,9 +78,65 @@ namespace plazza::reception {
         });
         _reaperThread->start();
 
-        const int code = shell.run();
+        int code = 0;
+        if (_graphic) {
+            render::Renderer renderer(*_logger, onOrder, [this]() { return pollStatus(); });
+            {
+                core::ScopedLock lock(&_ioMutex);
+                _uiEventSink = [&renderer](const std::string& line) { renderer.pushEvent(line); };
+            }
+            code = renderer.run();
+            // Detach the sink before the renderer is destroyed; holding _ioMutex
+            // here waits for any in-flight handleCompleted() sink call to finish.
+            {
+                core::ScopedLock lock(&_ioMutex);
+                _uiEventSink = nullptr;
+            }
+        } else {
+            Shell shell(*_logger, std::cin, std::cout, onOrder, [this]() {
+                core::ScopedLock lock(&_registryMutex);
+                std::vector<KitchenHandle*> handles;
+                for (const auto& kr : _registry) handles.push_back(kr.handle.get());
+                return handles;
+            });
+            code = shell.run();
+        }
         _logger->info("reception shutting down");
         return code;
+    }
+
+    std::vector<KitchenStatus> Reception::pollStatus()
+    {
+        core::ScopedLock lock(&_registryMutex);
+        for (auto& kr : _registry) {
+            try {
+                kr.handle->triggerStatusQuery();
+            } catch (...) {
+                // Kitchen died before we could query it; reported as offline below.
+            }
+        }
+
+        std::vector<KitchenStatus> out;
+        out.reserve(_registry.size());
+        const auto start = std::chrono::steady_clock::now();
+        const auto budget = std::chrono::milliseconds(120);
+        for (auto& kr : _registry) {
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start);
+            auto timeout = budget - elapsed;
+            if (timeout.count() < 0) timeout = std::chrono::milliseconds(0);
+
+            KitchenStatus s;
+            s.id = kr.id;
+            s.pid = kr.handle->pid();
+            auto reply = kr.handle->collectStatusReply(timeout);
+            if (reply.has_value()) {
+                s.online = true;
+                s.reply = *reply;
+            }
+            out.push_back(std::move(s));
+        }
+        return out;
     }
 
     void Reception::spawnKitchen()
@@ -128,13 +178,18 @@ namespace plazza::reception {
         if (!update.known) return;
 
         core::ScopedLock lock(&_ioMutex);
-        std::cout << update.pizzaLine << '\n';
         _logger->info(update.pizzaLine);
-        if (update.orderComplete) {
-            std::cout << update.orderLine << '\n';
-            _logger->info(update.orderLine);
+        if (update.orderComplete) _logger->info(update.orderLine);
+
+        if (_uiEventSink) {
+            // Graphic mode: feed the event log instead of writing to the canvas.
+            _uiEventSink(update.pizzaLine);
+            if (update.orderComplete) _uiEventSink(update.orderLine);
+        } else {
+            std::cout << update.pizzaLine << '\n';
+            if (update.orderComplete) std::cout << update.orderLine << '\n';
+            std::cout.flush();
         }
-        std::cout.flush();
     }
 
     void Reception::dispatchOrders()

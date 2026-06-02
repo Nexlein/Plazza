@@ -89,6 +89,40 @@ TEST_CASE("Frame: StatusQuery / StatusReply round-trip", "[protocol]")
     REQUIRE(std::holds_alternative<StatusReplyFrame>(rframe));
     CHECK(std::get<StatusReplyFrame>(rframe).cooksTotal == 4);
     CHECK(std::get<StatusReplyFrame>(rframe).outstanding == 3);
+    // No per-cook detail populated -> cooks vector round-trips as empty.
+    CHECK(std::get<StatusReplyFrame>(rframe).cooks.empty());
+}
+
+TEST_CASE("Frame: StatusReply round-trips per-cook state and stock", "[protocol]")
+{
+    StatusReplyFrame in;
+    in.cooksTotal = 3;
+    in.outstanding = 5;
+    for (std::size_t i = 0; i < in.stock.size(); ++i) in.stock[i] = static_cast<uint32_t>(i + 1);
+    in.cooks = {
+        {CookState::Idle, {}, {}, 0, 0},
+        {CookState::Waiting, PizzaType::Margarita, PizzaSize::M, 0, 0},
+        {CookState::Baking, PizzaType::Regina, PizzaSize::XL, 1200, 2000},
+    };
+
+    auto frame = decode(encode(in));
+    REQUIRE(std::holds_alternative<StatusReplyFrame>(frame));
+    const auto& out = std::get<StatusReplyFrame>(frame);
+
+    CHECK(out.cooksTotal == in.cooksTotal);
+    CHECK(out.outstanding == in.outstanding);
+    for (std::size_t i = 0; i < in.stock.size(); ++i) CHECK(out.stock[i] == in.stock[i]);
+
+    REQUIRE(out.cooks.size() == in.cooks.size());
+    CHECK(out.cooks[0].state == CookState::Idle);
+    CHECK(out.cooks[1].state == CookState::Waiting);
+    CHECK(out.cooks[1].type == PizzaType::Margarita);
+    CHECK(out.cooks[1].size == PizzaSize::M);
+    CHECK(out.cooks[2].state == CookState::Baking);
+    CHECK(out.cooks[2].type == PizzaType::Regina);
+    CHECK(out.cooks[2].size == PizzaSize::XL);
+    CHECK(out.cooks[2].elapsedMs == 1200);
+    CHECK(out.cooks[2].totalMs == 2000);
 }
 
 TEST_CASE("Frame: peekKind reads the kind byte", "[protocol]")

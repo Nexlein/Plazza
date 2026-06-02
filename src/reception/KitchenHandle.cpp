@@ -36,7 +36,14 @@ namespace plazza::reception {
     void KitchenHandle::sendFrame(const plazza::protocol::AnyFrame& frame)
     {
         plazza::core::ScopedLock lock(&_sendMutex);
-        _channel->send(plazza::protocol::encode(frame));
+        try {
+            _channel->send(plazza::protocol::encode(frame));
+        } catch (...) {
+            // The kitchen process has gone away (broken pipe). Drop the frame;
+            // the reaper will retire the handle shortly. With SIGPIPE ignored a
+            // write to the dead FIFO surfaces here as an exception rather than
+            // killing the reception.
+        }
     }
 
     void KitchenHandle::shutdown()

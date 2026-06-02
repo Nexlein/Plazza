@@ -12,6 +12,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "plazza/core/Mutex.hpp"
 #include "plazza/core/ThreadPool.hpp"
@@ -53,11 +54,25 @@ namespace plazza::kitchen {
         void handleFrame(const plazza::protocol::AnyFrame& frame);
         void sendFrame(const plazza::protocol::AnyFrame& frame);
 
+        // Live per-cook state, mirrored to the renderer via StatusReplyFrame.
+        // A slot is claimed when a pool task starts and freed when it finishes;
+        // at most _cfg.cookCount tasks run at once, so a free slot always exists.
+        struct CookSlotState {
+            bool busy{false};
+            bool baking{false};  // false => still waiting on ingredients
+            plazza::pizza::PizzaType type{};
+            plazza::pizza::PizzaSize size{};
+            long long startMs{0};
+            long long totalMs{0};
+        };
+
         Config _cfg;
         OnCompleteFn _onComplete;
         std::unique_ptr<plazza::ipc::FifoChannel> _channel;
         mutable plazza::core::Mutex _capMutex;
         std::size_t _outstanding{0};
+        mutable plazza::core::Mutex _cookStateMutex;
+        std::vector<CookSlotState> _cookSlots;
         plazza::core::Mutex _sendMutex;
         // _shuttingDown is declared before _stock so its lifetime fully covers
         // every cook's reference to it during pool teardown.
