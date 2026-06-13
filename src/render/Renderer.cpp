@@ -278,8 +278,8 @@ namespace plazza::render {
         const unsigned queue = k.outstanding > k.cooksTotal ? k.outstanding - k.cooksTotal : 0;
 
         caca_set_color_ansi(_canvas, CACA_WHITE, CACA_BLACK);
-        caca_printf(_canvas, x + 1, y + 1, "Kitchen #%zu  PID %d%s", k.id,
-                    static_cast<int>(k.pid), k.online ? "" : "  [offline]");
+        caca_printf(_canvas, x + 1, y + 1, "Kitchen #%zu  PID %d%s", k.id, static_cast<int>(k.pid),
+                    k.online ? "" : "  [offline]");
         caca_set_color_ansi(_canvas, CACA_LIGHTGRAY, CACA_BLACK);
         caca_printf(_canvas, x + 1, y + 2, "cooks %u/%u busy   queue %u", busy, k.cooksTotal,
                     queue);
@@ -316,8 +316,8 @@ namespace plazza::render {
 
             double frac = 0.0;
             if (c.totalMs > 0) {
-                double elapsed = static_cast<double>(c.elapsedMs) +
-                                 static_cast<double>(nowMsVal - k.polledAtMs);
+                double elapsed =
+                    static_cast<double>(c.elapsedMs) + static_cast<double>(nowMsVal - k.polledAtMs);
                 frac = elapsed / static_cast<double>(c.totalMs);
             }
             if (frac < 0.0) frac = 0.0;
