@@ -60,10 +60,30 @@ namespace plazza::protocol {
 
     struct StatusQueryFrame {};
 
+    // Live state of a single cook, reported inside a StatusReplyFrame so the
+    // graphical renderer can draw what each cook is doing. type/size are only
+    // meaningful when state != Idle; elapsedMs/totalMs only when state == Baking.
+    enum class CookState : uint32_t {
+        Idle = 0,     // no pizza assigned
+        Waiting = 1,  // pizza assigned, blocked on ingredient stock
+        Baking = 2,   // ingredients consumed, baking in progress
+    };
+
+    struct CookSlot {
+        CookState state{CookState::Idle};
+        plazza::pizza::PizzaType type{};
+        plazza::pizza::PizzaSize size{};
+        uint32_t elapsedMs{0};
+        uint32_t totalMs{0};
+    };
+
     struct StatusReplyFrame {
         uint32_t cooksTotal{0};
         uint32_t outstanding{0};
         std::array<uint32_t, 9> stock{};
+        // Per-cook live state; size() == cooksTotal. Empty for legacy callers
+        // that only populate the aggregate fields above.
+        std::vector<CookSlot> cooks{};
     };
 
     using AnyFrame =

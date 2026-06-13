@@ -4,6 +4,7 @@ out/
 cmake-build-*/
 
 *.o
+*.d
 *.a
 *.so
 *.gcno
@@ -13,6 +14,7 @@ cmake-build-*/
 *.pdf
 
 /plazza
+/unit_tests
 
 *.log
 

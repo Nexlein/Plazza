@@ -5,9 +5,8 @@
 ** test_order_tracker
 */
 
-#include <string>
-
 #include <catch2/catch_test_macros.hpp>
+#include <string>
 
 #include "plazza/pizza/PizzaSize.hpp"
 #include "plazza/pizza/PizzaType.hpp"

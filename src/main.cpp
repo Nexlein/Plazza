@@ -5,7 +5,9 @@
 ** Entry point
 */
 
+#include <csignal>
 #include <cstddef>
+#include <cstring>
 #include <iostream>
 #include <string>
 
@@ -15,7 +17,13 @@ namespace {
 
     void printUsage(const char* argv0)
     {
-        std::cerr << "usage: " << argv0 << " <multiplier> <cooks_per_kitchen> <restock_ms>\n";
+        std::cerr << "usage: " << argv0
+                  << " <multiplier> <cooks_per_kitchen> <restock_ms> [-g|--graphic]\n";
+    }
+
+    bool isGraphicFlag(const char* arg)
+    {
+        return std::strcmp(arg, "-g") == 0 || std::strcmp(arg, "--graphic") == 0;
     }
 
     bool parsePositiveFloat(const char* arg, float& out)
@@ -50,7 +58,15 @@ namespace {
 
 int main(int argc, char** argv)
 {
-    if (argc != 4) {
+    // A kitchen process that dies leaves its FIFO read end closed; without this,
+    // a write to it would deliver SIGPIPE and kill the reception. Treat it as a
+    // recoverable write error instead.
+    std::signal(SIGPIPE, SIG_IGN);
+
+    bool graphic = false;
+    if (argc == 5 && isGraphicFlag(argv[4])) {
+        graphic = true;
+    } else if (argc != 4) {
         printUsage(argv[0]);
         return 84;
     }
@@ -72,6 +88,6 @@ int main(int argc, char** argv)
         return 84;
     }
 
-    plazza::reception::Reception reception(multiplier, cooks, restockMs);
+    plazza::reception::Reception reception(multiplier, cooks, restockMs, graphic);
     return reception.run();
 }

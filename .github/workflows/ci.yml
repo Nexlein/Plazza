@@ -35,6 +35,9 @@ jobs:
       - name: Get code
         uses: actions/checkout@v6
 
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcaca-dev
+
       - name: Make configuration
         run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
 

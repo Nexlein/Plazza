@@ -12,12 +12,18 @@ endif()
 
 add_compile_options(-Wall -Wextra -Wpedantic)
 
+# libcaca (graphical bonus) — the render module lives under src/ and is part of
+# plazza_core, so the dependency is resolved here for both the binary and tests.
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(CACA REQUIRED caca)
+
 file(GLOB_RECURSE PLAZZA_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 list(FILTER PLAZZA_SOURCES EXCLUDE REGEX ".*/main\\.cpp$")
 
 add_library(plazza_core STATIC ${PLAZZA_SOURCES})
-target_include_directories(plazza_core PUBLIC include)
-target_link_libraries(plazza_core PUBLIC pthread)
+target_include_directories(plazza_core PUBLIC include ${CACA_INCLUDE_DIRS})
+target_link_libraries(plazza_core PUBLIC pthread ${CACA_LIBRARIES})
+target_link_directories(plazza_core PUBLIC ${CACA_LIBRARY_DIRS})
 
 add_executable(plazza src/main.cpp)
 target_link_libraries(plazza PRIVATE plazza_core)

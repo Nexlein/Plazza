@@ -98,9 +98,9 @@ TEST_CASE("Dispatch: 9 pizzas across 3 kitchens are balanced within ±1", "[disp
     // Attendre que les 9 soient acceptées
     FrameSink combined;
     auto cond = [&](const std::vector<AnyFrame>&) {
-        return countAccepted(sinks[0].snapshot()) +
-               countAccepted(sinks[1].snapshot()) +
-               countAccepted(sinks[2].snapshot()) == 9;
+        return countAccepted(sinks[0].snapshot()) + countAccepted(sinks[1].snapshot()) +
+                   countAccepted(sinks[2].snapshot()) ==
+               9;
     };
     REQUIRE(waitUntil(combined, 3s, cond));
 

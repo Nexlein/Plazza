@@ -22,6 +22,7 @@ namespace plazza::kitchen {
     {
         if (!_stock.waitAndConsume(_pizza.recipe, _stop)) return;
         long long ms = static_cast<long long>(_pizza.recipe.baseBakeTime * 1000.0F * _multiplier);
+        if (_onBakeStart) _onBakeStart(ms);
         if (ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(ms));
     }
 

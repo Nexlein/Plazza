@@ -17,16 +17,23 @@
 
 namespace plazza::kitchen {
 
+    namespace {
+        long long nowMs()
+        {
+            using namespace std::chrono;
+            return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+        }
+    }  // namespace
+
     Kitchen::Kitchen(Config cfg)
         : _cfg(std::move(cfg)),
           _stock(),
           _restocker(_stock, _cfg.restockMs),
           _pool(std::make_unique<plazza::core::ThreadPool>(_cfg.cookCount))
     {
+        _cookSlots.resize(_cfg.cookCount);
         if (_cfg.restockMs > 0) _restocker.start();
-        using namespace std::chrono;
-        _lastActiveTimeMs =
-            duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+        _lastActiveTimeMs = nowMs();
     }
 
     Kitchen::~Kitchen()
@@ -45,10 +52,34 @@ namespace plazza::kitchen {
             ++_outstanding;
         }
         _pool->enqueue([this, pizza, orderId, pizzaIdx]() {
+            // Claim a free cook slot for the renderer's per-cook view. A free
+            // slot always exists because the pool runs at most cookCount tasks.
+            std::size_t slot = _cookSlots.size();
+            {
+                plazza::core::ScopedLock lock(&_cookStateMutex);
+                for (std::size_t i = 0; i < _cookSlots.size(); ++i) {
+                    if (!_cookSlots[i].busy) {
+                        slot = i;
+                        _cookSlots[i] = CookSlotState{true, false, pizza.type, pizza.size, 0, 0};
+                        break;
+                    }
+                }
+            }
             try {
                 Cook cook(pizza, _cfg.cookingMultiplier, _stock, _shuttingDown);
+                cook.setOnBakeStart([this, slot](long long ms) {
+                    if (slot >= _cookSlots.size()) return;
+                    plazza::core::ScopedLock lock(&_cookStateMutex);
+                    _cookSlots[slot].baking = true;
+                    _cookSlots[slot].startMs = nowMs();
+                    _cookSlots[slot].totalMs = ms;
+                });
                 cook();
             } catch (...) {
+            }
+            if (slot < _cookSlots.size()) {
+                plazza::core::ScopedLock lock(&_cookStateMutex);
+                _cookSlots[slot] = CookSlotState{};
             }
             {
                 plazza::core::ScopedLock lock(&_capMutex);
@@ -88,12 +119,7 @@ namespace plazza::kitchen {
                 sendFrame(plazza::protocol::CompletedFrame{orderId, pizzaIdx});
             });
 
-            auto nowMs = []() {
-                using namespace std::chrono;
-                return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
-            };
-
-            _idleThread = std::make_unique<plazza::core::Thread>([this, nowMs]() {
+            _idleThread = std::make_unique<plazza::core::Thread>([this]() {
                 while (!_shuttingDown.load()) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(500));
                     if (_shuttingDown.load()) break;
@@ -143,9 +169,35 @@ namespace plazza::kitchen {
             for (std::size_t i = 0; i < 9; ++i)
                 stock[i] = static_cast<uint32_t>(
                     _stock.available(static_cast<plazza::pizza::Ingredient>(i)));
-            sendFrame(plazza::protocol::StatusReplyFrame{static_cast<uint32_t>(_cfg.cookCount),
-                                                         static_cast<uint32_t>(outstanding()),
-                                                         stock});
+
+            plazza::protocol::StatusReplyFrame reply{static_cast<uint32_t>(_cfg.cookCount),
+                                                     static_cast<uint32_t>(outstanding()), stock};
+            {
+                plazza::core::ScopedLock lock(&_cookStateMutex);
+                const long long now = nowMs();
+                reply.cooks.reserve(_cookSlots.size());
+                for (const auto& s : _cookSlots) {
+                    plazza::protocol::CookSlot c;
+                    if (!s.busy) {
+                        c.state = plazza::protocol::CookState::Idle;
+                    } else if (!s.baking) {
+                        c.state = plazza::protocol::CookState::Waiting;
+                        c.type = s.type;
+                        c.size = s.size;
+                    } else {
+                        c.state = plazza::protocol::CookState::Baking;
+                        c.type = s.type;
+                        c.size = s.size;
+                        long long elapsed = now - s.startMs;
+                        if (elapsed < 0) elapsed = 0;
+                        if (s.totalMs > 0 && elapsed > s.totalMs) elapsed = s.totalMs;
+                        c.elapsedMs = static_cast<uint32_t>(elapsed);
+                        c.totalMs = static_cast<uint32_t>(s.totalMs);
+                    }
+                    reply.cooks.push_back(c);
+                }
+            }
+            sendFrame(reply);
             return;
         }
     }
